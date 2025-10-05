@@ -1,0 +1,12 @@
+### These files should git ignore
+
+### Files to ignore 
+.claude/ 
+backup/
+docs/
+research/
+test/
+
+### Server files to ignore
+*.sh
+*.bat
