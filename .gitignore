@@ -3,7 +3,8 @@
 ### Files to ignore 
 .claude/ 
 backup/
-docs/
+docs/EXAMPLEprompts.md
+docs/textprompt.md
 research/
 test/
 
