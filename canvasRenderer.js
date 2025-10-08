@@ -11,6 +11,7 @@ import { renderMyelinatedAxon } from './myelinatedAxonTool.js';
 import { renderAxonHillock } from './axonHillockTool.js';
 import { renderApicalDendrite } from './apicalDendriteTool.js';
 import { graphToCanvas } from './graphTool.js';
+import { renderSynapse } from './synapseRenderer.js';
 
 /**
  * Draw an object on the canvas
@@ -69,6 +70,8 @@ export function drawObject(ctx, obj, editingObj = null, zoom = 1, isDarkMode = f
         drawImage(ctx, obj, zoom);
     } else if (obj.type === 'graph') {
         drawGraph(ctx, obj, zoom, isDarkMode);
+    } else if (obj.type === 'synapse') {
+        renderSynapse(ctx, obj, zoom, isDarkMode);
     }
 
     if (hasRotation) {
