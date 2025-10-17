@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Detailed Debug</title>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #000; color: #0f0; }
+        .error { color: #f00; }
+        .success { color: #0f0; }
+        .info { color: #0ff; }
+    </style>
+</head>
+<body>
+    <h1>Detailed Module Load Debug</h1>
+    <div id="log"></div>
+    <canvas id="canvas" style="display:none;"></canvas>
+    
+    <script type="module">
+        const log = document.getElementById('log');
+        
+        function addLog(msg, cls = 'info') {
+            log.innerHTML += `<p class="${cls}">${msg}</p>`;
+            console.log(msg);
+        }
+        
+        window.addEventListener('DOMContentLoaded', async () => {
+            try {
+                addLog('=== STARTING MODULE LOAD TEST ===', 'info');
+                
+                addLog('Loading StateMachine...', 'info');
+                const sm = await import('./src/core/StateMachine.js');
+                addLog('✓ StateMachine loaded', 'success');
+                
+                addLog('Loading ToolManager...', 'info');
+                const tm = await import('./src/core/ToolManager.js');
+                addLog('✓ ToolManager loaded', 'success');
+                
+                addLog('Loading CommandHistory...', 'info');
+                const ch = await import('./src/core/CommandHistory.js');
+                addLog('✓ CommandHistory loaded', 'success');
+                
+                addLog('Loading StateValidator...', 'info');
+                const sv = await import('./src/core/StateValidator.js');
+                addLog('✓ StateValidator loaded', 'success');
+                
+                addLog('Loading ArchitectureIntegration...', 'info');
+                const ai = await import('./src/core/ArchitectureIntegration.js');
+                addLog('✓ ArchitectureIntegration loaded', 'success');
+                
+                addLog('Loading SelectTool...', 'info');
+                const st = await import('./src/tools/SelectTool.js');
+                addLog('✓ SelectTool loaded', 'success');
+                
+                addLog('Loading CircleTool...', 'info');
+                const ct = await import('./src/tools/CircleTool.js');
+                addLog('✓ CircleTool loaded', 'success');
+                
+                addLog('Loading TextEditor...', 'info');
+                const te = await import('./textEditor.js');
+                addLog('✓ TextEditor loaded', 'success');
+                
+                addLog('Loading canvasRenderer...', 'info');
+                const cr = await import('./canvasRenderer.js');
+                addLog('✓ canvasRenderer loaded', 'success');
+                
+                addLog('', 'info');
+                addLog('NOW LOADING APP.JS...', 'info');
+                const { app } = await import('./app.js');
+                addLog('✓✓✓ APP.JS LOADED SUCCESSFULLY! ✓✓✓', 'success');
+                
+                addLog('', 'info');
+                addLog('Setting window.app...', 'info');
+                window.app = app;
+                addLog('✓ window.app set', 'success');
+                
+                addLog('', 'info');
+                addLog('Calling app.init()...', 'info');
+                app.init();
+                addLog('✓✓✓ APP.INIT() COMPLETED! ✓✓✓', 'success');
+                
+                addLog('', 'info');
+                addLog('=== ALL TESTS PASSED ===', 'success');
+                
+            } catch (error) {
+                addLog('', 'error');
+                addLog(`❌❌❌ ERROR: ${error.name}`, 'error');
+                addLog(`Message: ${error.message}`, 'error');
+                addLog(`Stack:`, 'error');
+                addLog(error.stack, 'error');
+                console.error('Full error:', error);
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NeuroSketch - Explore</title>
+    <link rel="stylesheet" href="styles/explore.css">
+</head>
+<body>
+    <!-- Canvas for Three.js -->
+    <canvas id="brain-canvas"></canvas>
+    
+    <!-- Top-left HUD -->
+    <div id="hud">
+        <div id="controls-dropdown">
+            <button id="controls-btn">
+                <span class="hamburger">☰</span>
+                <span class="label">Controls</span>
+            </button>
+            <div id="dropdown-menu" class="hidden">
+                <button onclick="resetBrain()">Reset Brain</button>
+                <button onclick="toggleWireframe()">Toggle Wireframe</button>
+                <button onclick="goHome()">Home</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Bottom-left Home button -->
+    <button id="home-btn" onclick="goHome()">HOME</button>
+    
+    <!-- Lock button (positioned via JS after brain loads) -->
+    <button id="lock-btn" class="hidden">
+        <svg id="lock-icon-unlocked" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+            <rect x="5" y="11" width="14" height="10" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0 1 9.9-1"/>
+        </svg>
+        <svg id="lock-icon-locked" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" class="hidden">
+            <rect x="5" y="11" width="14" height="10" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        </svg>
+    </button>
+    
+    <!-- Loading indicator -->
+    <div id="loading">
+        <div class="spinner"></div>
+        <p>Loading Brain Model...</p>
+    </div>
+
+    <!-- Three.js from CDN -->
+    <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+
+    <script type="module" src="./src/explore/main.js"></script>
+    
+    <script>
+        function goHome() {
+            window.location.href = 'gateway.html';
+        }
+        
+        // Dropdown toggle
+        document.addEventListener('DOMContentLoaded', () => {
+            const controlsBtn = document.getElementById('controls-btn');
+            const dropdown = document.getElementById('dropdown-menu');
+            
+            controlsBtn.addEventListener('click', () => {
+                dropdown.classList.toggle('hidden');
+            });
+            
+            // Close dropdown when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('#controls-dropdown')) {
+                    dropdown.classList.add('hidden');
+                }
+            });
+        });
+    </script>
+</body>
+</html>

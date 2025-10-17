@@ -1,0 +1,141 @@
+/* Gateway Entry Page Styles */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Georgia', 'Times New Roman', serif;
+    overflow: hidden;
+    transition: background-color 0.3s, color 0.3s;
+    height: 100vh;
+    width: 100vw;
+}
+
+body.dark-mode {
+    background: #000000;
+    color: #FFFFFF;
+}
+
+body.light-mode {
+    background: #FFFFFF;
+    color: #000000;
+}
+
+#gateway-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    width: 100vw;
+}
+
+#gateway-content {
+    text-align: center;
+    max-width: 800px;
+    padding: 40px;
+}
+
+#gateway-title {
+    font-size: 72px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+    animation: fadeIn 0.8s ease-in;
+}
+
+#gateway-tagline {
+    font-size: 18px;
+    font-weight: 400;
+    letter-spacing: 1px;
+    margin-bottom: 60px;
+    opacity: 0.7;
+    animation: fadeIn 1.2s ease-in;
+}
+
+#gateway-buttons {
+    display: flex;
+    gap: 40px;
+    justify-content: center;
+    animation: fadeIn 1.6s ease-in;
+}
+
+.gateway-btn {
+    border: 3px solid;
+    background: transparent;
+    padding: 20px 60px;
+    cursor: pointer;
+    font-size: 24px;
+    font-family: 'Georgia', serif;
+    font-weight: 700;
+    letter-spacing: 2px;
+    transition: all 0.3s;
+    text-transform: uppercase;
+    min-width: 220px;
+}
+
+.dark-mode .gateway-btn {
+    color: #FFFFFF;
+    border-color: #FFFFFF;
+}
+
+.dark-mode .gateway-btn:hover {
+    background: #FFFFFF;
+    color: #000000;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 16px rgba(255, 255, 255, 0.2);
+}
+
+.light-mode .gateway-btn {
+    color: #000000;
+    border-color: #000000;
+}
+
+.light-mode .gateway-btn:hover {
+    background: #000000;
+    color: #FFFFFF;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+}
+
+.gateway-btn:active {
+    transform: translateY(0);
+}
+
+/* Fade in animation */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    #gateway-title {
+        font-size: 48px;
+    }
+
+    #gateway-tagline {
+        font-size: 14px;
+        margin-bottom: 40px;
+    }
+
+    #gateway-buttons {
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    .gateway-btn {
+        padding: 16px 40px;
+        font-size: 20px;
+        min-width: 180px;
+    }
+}

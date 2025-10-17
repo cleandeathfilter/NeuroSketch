@@ -46,6 +46,8 @@ export function drawObject(ctx, obj, editingObj = null, zoom = 1, isDarkMode = f
         drawLine(ctx, obj, zoom);
     } else if (obj.type === 'text') {
         drawText(ctx, obj, zoom, isDarkMode);
+    } else if (obj.type === 'polygon') {
+        drawPolygon(ctx, obj, zoom);
     } else if (obj.type === 'triangle') {
         drawTriangle(ctx, obj, zoom);
     } else if (obj.type === 'hexagon') {
@@ -83,13 +85,16 @@ export function drawObject(ctx, obj, editingObj = null, zoom = 1, isDarkMode = f
  * Get the center point of an object for rotation
  */
 function getObjectCenter(obj) {
-    if (obj.type === 'circle') {
+    if (obj.type === 'circle' || obj.type === 'hexagon' || obj.type === 'polygon') {
+        // Center-based objects (circle, hexagon, all polygons)
         return { x: obj.x, y: obj.y };
     } else if (obj.type === 'line' || obj.type === 'taperedLine' || obj.type === 'unmyelinatedAxon' || obj.type === 'myelinatedAxon' || obj.type === 'apicalDendrite') {
         return {
             x: (obj.x1 + obj.x2) / 2,
             y: (obj.y1 + obj.y2) / 2
         };
+    } else if (obj.type === 'triangle') {
+        // Triangle now uses radius (center-based)
         return { x: obj.x, y: obj.y };
     } else if (obj.type === 'freehand') {
         // Calculate bounds for freehand
@@ -106,7 +111,7 @@ function getObjectCenter(obj) {
             y: (minY + maxY) / 2
         };
     } else {
-        // Rectangle, text, triangle, hexagon, ellipse, graph, curvedPath, image
+        // Rectangle, text, ellipse, graph, curvedPath, image
         return {
             x: obj.x + (obj.width || 0) / 2,
             y: obj.y + (obj.height || 0) / 2
@@ -157,10 +162,13 @@ function drawRectangle(ctx, obj, zoom) {
  */
 function drawLine(ctx, obj, zoom) {
     ctx.beginPath();
-    ctx.moveTo(obj.x, obj.y);
+    // Support both {x, y, x2, y2} (old) and {x1, y1, x2, y2} (new)
+    const x1 = obj.x1 !== undefined ? obj.x1 : obj.x;
+    const y1 = obj.y1 !== undefined ? obj.y1 : obj.y;
+    ctx.moveTo(x1, y1);
     ctx.lineTo(obj.x2, obj.y2);
-    ctx.strokeStyle = obj.strokeColor;
-    ctx.lineWidth = obj.strokeWidth / zoom;
+    ctx.strokeStyle = obj.strokeColor || '#000000';
+    ctx.lineWidth = (obj.strokeWidth || 2) / zoom;
     ctx.stroke();
 }
 
@@ -381,13 +389,14 @@ export function drawSelection(ctx, obj, zoom, isDarkMode) {
             bottom: Math.max(obj.y, obj.y2) + 5 / zoom
         };
     } else if (obj.type === 'triangle') {
+        // Triangle now uses polygon format with radius
         bounds = {
-            left: obj.x - obj.width / 2,
-            right: obj.x + obj.width / 2,
-            top: obj.y - obj.height / 2,
-            bottom: obj.y + obj.height / 2
+            left: obj.x - obj.radius,
+            right: obj.x + obj.radius,
+            top: obj.y - obj.radius,
+            bottom: obj.y + obj.radius
         };
-    } else if (obj.type === 'hexagon') {
+    } else if (obj.type === 'hexagon' || obj.type === 'polygon') {
         bounds = {
             left: obj.x - obj.radius,
             right: obj.x + obj.radius,
@@ -641,6 +650,45 @@ export function drawSelection(ctx, obj, zoom, isDarkMode) {
 }
 
 /**
+ * Draw a regular polygon (3-10 sides)
+ */
+function drawPolygon(ctx, obj, zoom) {
+    const { x, y, radius, sides, rotation = 0 } = obj;
+    
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(rotation);
+    
+    ctx.beginPath();
+    for (let i = 0; i <= sides; i++) {
+        const angle = (2 * Math.PI / sides) * i - Math.PI / 2;
+        const px = radius * Math.cos(angle);
+        const py = radius * Math.sin(angle);
+        
+        if (i === 0) {
+            ctx.moveTo(px, py);
+        } else {
+            ctx.lineTo(px, py);
+        }
+    }
+    ctx.closePath();
+    
+    ctx.restore();
+    
+    // Apply styles
+    if (obj.fillColor && obj.fillColor !== 'transparent') {
+        ctx.fillStyle = obj.fillColor;
+        ctx.fill();
+    }
+    
+    if (obj.strokeColor) {
+        ctx.strokeStyle = obj.strokeColor;
+        ctx.lineWidth = (obj.strokeWidth || 2) / zoom;
+        ctx.stroke();
+    }
+}
+
+/**
  * Draw a triangle object (pyramidal neuron soma)
  */
 function drawTriangle(ctx, obj, zoom) {
@@ -713,8 +761,9 @@ function drawEllipse(ctx, obj, zoom) {
  */
 function drawBipolarSoma(ctx, obj, zoom) {
     ctx.beginPath();
-    const rx = obj.width / 2;
-    const ry = obj.height / 2;
+    // Support both {radiusX, radiusY} (new) and {width, height} (old)
+    const rx = obj.radiusX !== undefined ? obj.radiusX : obj.width / 2;
+    const ry = obj.radiusY !== undefined ? obj.radiusY : obj.height / 2;
     ctx.ellipse(obj.x, obj.y, rx, ry, (obj.rotation || 0) * Math.PI / 180, 0, Math.PI * 2);
 
     if (obj.fillColor && obj.fillColor !== 'transparent') {
@@ -724,7 +773,23 @@ function drawBipolarSoma(ctx, obj, zoom) {
 
     if (obj.strokeColor) {
         ctx.strokeStyle = obj.strokeColor;
-        ctx.lineWidth = obj.strokeWidth / zoom;
+        ctx.lineWidth = (obj.strokeWidth || 2) / zoom;
+        ctx.stroke();
+    }
+    
+    // Draw bipolar processes if requested
+    if (obj.showProcesses) {
+        ctx.strokeStyle = obj.strokeColor || '#9B59B6';
+        ctx.lineWidth = 2 / zoom;
+        // Top process
+        ctx.beginPath();
+        ctx.moveTo(obj.x, obj.y - ry);
+        ctx.lineTo(obj.x, obj.y - ry - 15);
+        ctx.stroke();
+        // Bottom process
+        ctx.beginPath();
+        ctx.moveTo(obj.x, obj.y + ry);
+        ctx.lineTo(obj.x, obj.y + ry + 15);
         ctx.stroke();
     }
 }
@@ -775,6 +840,14 @@ function drawFreehand(ctx, obj, zoom) {
     ctx.lineWidth = obj.strokeWidth || 2;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
+
+    // Apply line style (solid, dotted, dashed)
+    if (obj.lineStyle === 'dotted') {
+        ctx.setLineDash([2, 5]);
+    } else if (obj.lineStyle === 'dashed') {
+        ctx.setLineDash([10, 5]);
+    }
+    // else solid (default - no setLineDash needed)
 
     ctx.beginPath();
 

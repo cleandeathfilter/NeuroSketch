@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NeuroSketch</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Georgia', 'Times New Roman', serif;
+            overflow: hidden;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        body.light-mode {
+            background: #FFFFFF;
+            color: #000000;
+        }
+
+        body.dark-mode {
+            background: #000000;
+            color: #FFFFFF;
+        }
+
+        #app {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        #topBar {
+            height: 50px;
+            border-bottom: 2px solid;
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            z-index: 100;
+            transition: border-color 0.3s, background-color 0.3s;
+        }
+
+        .light-mode #topBar {
+            background: #FFFFFF;
+            border-color: #000000;
+        }
+
+        .dark-mode #topBar {
+            background: #000000;
+            border-color: #FFFFFF;
+        }
+
+        #topBar h1 {
+            font-size: 24px;
+            font-weight: 700;
+            margin-right: auto;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .topBtn {
+            border: 2px solid;
+            background: transparent;
+            padding: 6px 16px;
+            margin-left: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            font-family: 'Georgia', serif;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            transition: all 0.2s;
+            text-transform: uppercase;
+        }
+
+        .light-mode .topBtn {
+            color: #000000;
+            border-color: #000000;
+        }
+
+        .light-mode .topBtn:hover {
+            background: #000000;
+            color: #FFFFFF;
+        }
+
+        .dark-mode .topBtn {
+            color: #FFFFFF;
+            border-color: #FFFFFF;
+        }
+
+        .dark-mode .topBtn:hover {
+            background: #FFFFFF;
+            color: #000000;
+        }
+
+        #themeToggle {
+            margin-left: 20px;
+            padding-left: 20px;
+            border-left: 2px solid;
+        }
+
+        .light-mode #themeToggle {
+            border-color: #000000;
+        }
+
+        .dark-mode #themeToggle {
+            border-color: #FFFFFF;
+        }
+
+        #mainArea {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        #toolbar {
+            width: 60px;
+            border-right: 2px solid;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 10px 0;
+            gap: 5px;
+            transition: border-color 0.3s, background-color 0.3s;
+        }
+
+        .light-mode #toolbar {
+            background: #FFFFFF;
+            border-color: #000000;
+        }
+
+        .dark-mode #toolbar {
+            background: #000000;
+            border-color: #FFFFFF;
+        }
+
+        .toolBtn {
+            width: 44px;
+            height: 44px;
+            background: transparent;
+            border: 2px solid;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            font-weight: bold;
+        }
+
+        .light-mode .toolBtn {
+            color: #000000;
+            border-color: #000000;
+        }
+
+        .light-mode .toolBtn:hover {
+            background: #000000;
+            color: #FFFFFF;
+        }
+
+        .light-mode .toolBtn.active {
+            background: #000000;
+            color: #FFFFFF;
+        }
+
+        .dark-mode .toolBtn {
+            color: #FFFFFF;
+            border-color: #FFFFFF;
+        }
+
+        .dark-mode .toolBtn:hover {
+            background: #FFFFFF;
+            color: #000000;
+        }
+
+        .dark-mode .toolBtn.active {
+            background: #FFFFFF;
+            color: #000000;
+        }
+
+        /* Tool Category Dropdown Styles */
+        .toolCategory {
+            position: relative;
+            width: 44px;
+            margin-bottom: 5px;
+        }
+
+        .toolCategory .toolBtn {
+            position: relative;
+        }
+
+        .toolCategory .dropdown-indicator {
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            width: 0;
+            height: 0;
+            border-left: 4px solid transparent;
+            border-right: 4px solid transparent;
+            border-top: 4px solid currentColor;
+            opacity: 0.7;
+        }
+
+        .toolDropdown {
+            position: absolute;
+            left: 60px;
+            top: 0;
+            background: inherit;
+            border: 2px solid;
+            border-radius: 4px;
+            padding: 8px;
+            display: none;
+            flex-direction: column;
+            gap: 5px;
+            z-index: 1000;
+            min-width: 150px;
+            box-shadow: 4px 4px 12px rgba(0,0,0,0.3);
+        }
+
+        .light-mode .toolDropdown {
+            background: #FFFFFF;
+            border-color: #000000;
+        }
+
+        .dark-mode .toolDropdown {
+            background: #000000;
+            border-color: #FFFFFF;
+        }
+
+        .toolCategory.open .toolDropdown {
+            display: flex;
+        }
+
+        .toolDropdown .dropdownItem {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px;
+            cursor: pointer;
+            border: 1px solid;
+            border-radius: 2px;
+            transition: all 0.2s;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .light-mode .toolDropdown .dropdownItem {
+            border-color: #CCCCCC;
+            color: #000000;
+        }
+
+        .light-mode .toolDropdown .dropdownItem:hover {
+            background: #000000;
+            color: #FFFFFF;
+            border-color: #000000;
+        }
+
+        .dark-mode .toolDropdown .dropdownItem {
+            border-color: #444444;
+            color: #FFFFFF;
+        }
+
+        .dark-mode .toolDropdown .dropdownItem:hover {
+            background: #FFFFFF;
+            color: #000000;
+            border-color: #FFFFFF;
+        }
+
+        .dropdownItem .icon {
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .dropdownItem .label {
+            flex: 1;
+        }
+
+        .dropdownItem .shortcut {
+            font-size: 10px;
+            opacity: 0.6;
+            font-family: monospace;
+        }
+
+        .toolSeparator {
+            width: 80%;
+            height: 2px;
+            margin: 8px auto;
+            background: currentColor;
+            opacity: 0.3;
+        }
+
+        #canvasContainer {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            transition: background-color 0.3s;
+        }
+
+        .light-mode #canvasContainer {
+            background: #F8F8F8;
+        }
+
+        .dark-mode #canvasContainer {
+            background: #0A0A0A;
+        }
+
+        #canvas {
+            position: absolute;
+            cursor: default;
+        }
+
+        #rightPanel {
+            width: 280px;
+            padding: 20px;
+            overflow-y: auto;
+            border-left: 2px solid;
+            transition: width 0.3s, padding 0.3s, border-color 0.3s, background-color 0.3s;
+        }
+
+        .light-mode #rightPanel {
+            background: #FFFFFF;
+            border-color: #000000;
+        }
+
+        .dark-mode #rightPanel {
+            background: #000000;
+            border-color: #FFFFFF;
+        }
+
+        #rightPanel.collapsed {
+            width: 0;
+            padding: 0;
+            border-left-width: 0;
+            overflow: hidden;
+        }
+
+        .panelSection {
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid;
+        }
+
+        .light-mode .panelSection {
+            border-color: #CCCCCC;
+        }
+
+        .dark-mode .panelSection {
+            border-color: #333333;
+        }
+
+        .panelSection:last-child {
+            border-bottom: none;
+        }
+
+        .panelSection h3 {
+            font-size: 14px;
+            margin-bottom: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .propRow {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .propRow label {
+            font-size: 12px;
+            width: 80px;
+            font-weight: 600;
+        }
+
+        .propRow input, .propRow select {
+            flex: 1;
+            padding: 6px;
+            border: 1px solid;
+            font-size: 12px;
+            font-family: 'Georgia', serif;
+            transition: all 0.2s;
+        }
+
+        .light-mode .propRow input,
+        .light-mode .propRow select {
+            background: #FFFFFF;
+            color: #000000;
+            border-color: #000000;
+        }
+
+        .light-mode .propRow input:focus,
+        .light-mode .propRow select:focus {
+            outline: none;
+            background: #F0F0F0;
+        }
+
+        .dark-mode .propRow input,
+        .dark-mode .propRow select {
+            background: #000000;
+            color: #FFFFFF;
+            border-color: #FFFFFF;
+        }
+
+        .dark-mode .propRow input:focus,
+        .dark-mode .propRow select:focus {
+            outline: none;
+            background: #1A1A1A;
+        }
+
+        .propRow input[type="color"] {
+            height: 32px;
+            cursor: pointer;
+            padding: 2px;
+        }
+
+        .propRow input[type="range"] {
+            cursor: pointer;
+        }
+
+        .toggleBtn {
+            border: 2px solid;
+            background: transparent;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 12px;
+            width: 100%;
+            font-family: 'Georgia', serif;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            transition: all 0.2s;
+        }
+
+        .light-mode .toggleBtn {
+            color: #000000;
+            border-color: #000000;
+        }
+
+        .light-mode .toggleBtn:hover,
+        .light-mode .toggleBtn.active {
+            background: #000000;
+            color: #FFFFFF;
+        }
+
+        .dark-mode .toggleBtn {
+            color: #FFFFFF;
+            border-color: #FFFFFF;
+        }
+
+        .dark-mode .toggleBtn:hover,
+        .dark-mode .toggleBtn.active {
+            background: #FFFFFF;
+            color: #000000;
+        }
+
+        #collapseBtn {
+            position: absolute;
+            right: 280px;
+            top: 60px;
+            border: 2px solid;
+            width: 28px;
+            height: 50px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: right 0.3s, background-color 0.2s, border-color 0.3s;
+            z-index: 50;
+            font-weight: bold;
+            background: transparent;
+        }
+
+        .light-mode #collapseBtn {
+            color: #000000;
+            border-color: #000000;
+        }
+
+        .light-mode #collapseBtn:hover {
+            background: #000000;
+            color: #FFFFFF;
+        }
+
+        .dark-mode #collapseBtn {
+            color: #FFFFFF;
+            border-color: #FFFFFF;
+        }
+
+        .dark-mode #collapseBtn:hover {
+            background: #FFFFFF;
+            color: #000000;
+        }
+
+        #collapseBtn.collapsed {
+            right: 0;
+        }
+
+        .info-text {
+            font-size: 12px;
+            font-style: italic;
+            opacity: 0.7;
+        }
+
+        .shortcut-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            font-size: 11px;
+            border-bottom: 1px dotted;
+        }
+
+        .light-mode .shortcut-item {
+            border-color: #CCCCCC;
+        }
+
+        .dark-mode .shortcut-item {
+            border-color: #333333;
+        }
+
+        .shortcut-item:last-child {
+            border-bottom: none;
+        }
+
+        .shortcut-key {
+            font-weight: 700;
+            font-family: monospace;
+        }
+
+        /* Circuit menu CSS removed - will rebuild later */
+
+        .light-mode .circuitOption {
+            color: #000000;
+            border-color: #E0E0E0;
+        }
+
+        .light-mode .circuitOption:hover {
+            background: #F0F0F0;
+        }
+
+        .dark-mode .circuitOption {
+            color: #FFFFFF;
+            border-color: #333333;
+        }
+
+        .dark-mode .circuitOption:hover {
+            background: #222222;
+        }
+
+        .circuitOption:last-child {
+            border-bottom: none;
+        }
+
+        #circuitsMenu {
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+    </style>
+</head>
+<body class="dark-mode">
+    <div id="app">
+        <div id="topBar">
+            <h1>NeuroSketch</h1>
+            <button class="topBtn" onclick="window.location.href='gateway.html'">Home</button>
+            <button class="topBtn" onclick="app.newCanvas()">New</button>
+            <button class="topBtn" onclick="app.save()">Save</button>
+            <button class="topBtn" onclick="app.load()">Load</button>
+            <button class="topBtn" onclick="app.export()">Export</button>
+            <!-- Circuits menu removed - will rebuild later -->
+            <button class="topBtn" id="themeToggle" onclick="app.toggleTheme()">Light Mode</button>
+        </div>
+        <div id="mainArea">
+            <div id="toolbar">
+                <!-- SELECT TOOL (Always visible) -->
+                <button class="toolBtn active" data-tool="select" title="Select/Move (V)">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/>
+                    </svg>
+                </button>
+
+                <div class="toolSeparator"></div>
+
+                <!-- SHAPES CATEGORY -->
+                <div class="toolCategory" data-category="shapes">
+                    <button class="toolBtn" data-tool="rectangle" title="Shapes (R)">
+                        □
+                        <div class="dropdown-indicator"></div>
+                    </button>
+                    <div class="toolDropdown">
+                        <div class="dropdownItem" data-tool="rectangle">
+                            <div class="icon">□</div>
+                            <div class="label">Rectangle</div>
+                            <div class="shortcut">R</div>
+                        </div>
+                        <div class="dropdownItem" data-tool="circle">
+                            <div class="icon">○</div>
+                            <div class="label">Circle</div>
+                            <div class="shortcut">C</div>
+                        </div>
+                        <div class="dropdownItem" data-tool="line">
+                            <div class="icon">/</div>
+                            <div class="label">Line</div>
+                            <div class="shortcut">L</div>
+                        </div>
+                        <div class="dropdownItem" data-tool="triangle">
+                            <div class="icon">△</div>
+                            <div class="label">Triangle</div>
+                            <div class="shortcut">3</div>
+                        </div>
+                        <div class="dropdownItem" data-tool="square">
+                            <div class="icon">◻</div>
+                            <div class="label">Square</div>
+                            <div class="shortcut">4</div>
+                        </div>
+                        <div class="dropdownItem" data-tool="pentagon">
+                            <div class="icon">⬠</div>
+                            <div class="label">Pentagon</div>
+                            <div class="shortcut">5</div>
+                        </div>
+                        <div class="dropdownItem" data-tool="hexagon">
+                            <div class="icon">⬡</div>
+                            <div class="label">Hexagon</div>
+                            <div class="shortcut">6</div>
+                        </div>
+                        <div class="dropdownItem" data-tool="heptagon">
+                            <div class="icon">⬢</div>
+                            <div class="label">Heptagon</div>
+                            <div class="shortcut">7</div>
+                        </div>
+                        <div class="dropdownItem" data-tool="octagon">
+                            <div class="icon">⬣</div>
+                            <div class="label">Octagon</div>
+                            <div class="shortcut">8</div>
+                        </div>
+                        <div class="dropdownItem" data-tool="nonagon">
+                            <div class="icon">⏣</div>
+                            <div class="label">Nonagon</div>
+                            <div class="shortcut">9</div>
+                        </div>
+                        <div class="dropdownItem" data-tool="decagon">
+                            <div class="icon">⏢</div>
+                            <div class="label">Decagon</div>
+                            <div class="shortcut">0</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- DRAW CATEGORY -->
+                <div class="toolCategory" data-category="draw">
+                    <button class="toolBtn" data-tool="freehand" title="Draw (F)">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 20 Q8 5, 12 12 T20 8"/>
+                        </svg>
+                        <div class="dropdown-indicator"></div>
+                    </button>
+                    <div class="toolDropdown">
+                        <div class="dropdownItem" data-tool="freehand">
+                            <div class="icon">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M3 20 Q8 5, 12 12 T20 8"/>
+                                </svg>
+                            </div>
+                            <div class="label">Freehand</div>
+                            <div class="shortcut">F</div>
+                        </div>
+                        <div class="dropdownItem" data-tool="text">
+                            <div class="icon">T</div>
+                            <div class="label">Text</div>
+                            <div class="shortcut">T</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="toolSeparator"></div>
+
+                <!-- IMAGE IMPORT -->
+                <button class="toolBtn" onclick="app.importImage()" title="Import Image">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                        <circle cx="8.5" cy="8.5" r="1.5"/>
+                        <polyline points="21 15 16 10 5 21"/>
+                    </svg>
+                </button>
+            </div>
+            <div id="canvasContainer">
+                <canvas id="canvas"></canvas>
+            </div>
+            <button id="collapseBtn" onclick="app.togglePanel()">◀</button>
+            <div id="rightPanel">
+                <div class="panelSection">
+                    <h3>Canvas</h3>
+                    <button class="toggleBtn" id="gridToggle" onclick="app.toggleGrid()">Show Grid</button>
+                </div>
+                <div class="panelSection">
+                    <h3>Zoom</h3>
+                    <div class="propRow">
+                        <label>Level:</label>
+                        <input type="range" id="zoomSlider" min="10" max="500" value="100" oninput="app.setZoom(this.value)">
+                        <span id="zoomValue" style="margin-left: 8px; font-size: 12px; font-weight: 600;">100%</span>
+                    </div>
+                </div>
+                <div class="panelSection">
+                    <h3>Dimensions</h3>
+                    <button class="toggleBtn" id="dimensionsToggle" onclick="app.toggleDimensions()">Show Dimensions</button>
+                    <div class="propRow" style="margin-top: 10px;">
+                        <label>Units:</label>
+                        <select id="dimensionUnits" onchange="app.setDimensionUnits(this.value)" style="flex: 1; padding: 4px; border-radius: 4px;">
+                            <option value="px">Pixels (px)</option>
+                            <option value="mm">Millimeters (mm)</option>
+                            <option value="cm">Centimeters (cm)</option>
+                            <option value="in">Inches (in)</option>
+                        </select>
+                    </div>
+                    <div class="propRow">
+                        <label>DPI:</label>
+                        <input type="number" id="dimensionDPI" value="96" min="72" max="300" onchange="app.setDimensionDPI(this.value)" style="flex: 1; padding: 4px; border-radius: 4px;">
+                    </div>
+                </div>
+                <div class="panelSection" id="objectProps">
+                    <h3>Properties</h3>
+                    <p class="info-text" id="propsInfo">Select an object to edit properties</p>
+                    <div id="propsContent" style="display: none;">
+                        <div class="propRow" id="dimensionInputRow" style="display: none;">
+                            <label>Width:</label>
+                            <input type="number" id="objectWidth" min="1" step="1" onchange="app.updateObjectDimension('width', this.value)" style="flex: 1; padding: 4px; border-radius: 4px;">
+                        </div>
+                        <div class="propRow" id="dimensionInputRow2" style="display: none;">
+                            <label>Height:</label>
+                            <input type="number" id="objectHeight" min="1" step="1" onchange="app.updateObjectDimension('height', this.value)" style="flex: 1; padding: 4px; border-radius: 4px;">
+                        </div>
+                        <div class="propRow" id="radiusInputRow" style="display: none;">
+                            <label>Radius:</label>
+                            <input type="number" id="objectRadius" min="1" step="1" onchange="app.updateObjectDimension('radius', this.value)" style="flex: 1; padding: 4px; border-radius: 4px;">
+                        </div>
+                        <div class="propRow" id="positionInputRow" style="display: none;">
+                            <label>X:</label>
+                            <input type="number" id="objectX" step="1" onchange="app.updateObjectDimension('x', this.value)" style="width: 70px; padding: 4px; border-radius: 4px;">
+                            <label style="margin-left: 10px;">Y:</label>
+                            <input type="number" id="objectY" step="1" onchange="app.updateObjectDimension('y', this.value)" style="width: 70px; padding: 4px; border-radius: 4px;">
+                        </div>
+                        <div class="propRow" id="rotationInputRow" style="display: none;">
+                            <label>Rotation:</label>
+                            <input type="number" id="objectRotation" min="0" max="360" step="1" onchange="app.updateObjectDimension('rotation', this.value)" style="flex: 1; padding: 4px; border-radius: 4px;">
+                            <span style="margin-left: 5px;">°</span>
+                        </div>
+                        <div class="propRow">
+                            <label>Fill:</label>
+                            <input type="color" id="fillColor" value="#000000" onchange="app.updateSelectedProp('fillColor', this.value)">
+                        </div>
+                        <div class="propRow">
+                            <label>Stroke:</label>
+                            <input type="color" id="strokeColor" value="#FFFFFF" onchange="app.updateSelectedProp('strokeColor', this.value)">
+                        </div>
+                        <div class="propRow">
+                            <label>Stroke Width:</label>
+                            <input type="number" id="strokeWidth" value="2" min="0" max="20" onchange="app.updateSelectedProp('strokeWidth', this.value)">
+                        </div>
+                    </div>
+
+                    <!-- Text Properties -->
+                    <div id="textPropsContent" style="display: none;">
+                        <div class="propRow">
+                            <label>Font:</label>
+                            <select id="fontFamily" onchange="app.updateSelectedProp('fontFamily', this.value)">
+                                <option value="Arial">Arial</option>
+                                <option value="Helvetica">Helvetica</option>
+                                <option value="Times New Roman">Times New Roman</option>
+                                <option value="Courier">Courier</option>
+                            </select>
+                        </div>
+                        <div class="propRow">
+                            <label>Size:</label>
+                            <input type="number" id="fontSize" value="16" min="8" max="72" onchange="app.updateSelectedProp('fontSize', this.value)">
+                        </div>
+                        <div class="propRow">
+                            <label>Color:</label>
+                            <input type="color" id="textColor" value="#FFFFFF" onchange="app.updateSelectedProp('textColor', this.value)">
+                        </div>
+                        <div class="propRow">
+                            <label>Align:</label>
+                            <select id="textAlign" onchange="app.updateSelectedProp('textAlign', this.value)">
+                                <option value="left">Left</option>
+                                <option value="center">Center</option>
+                                <option value="right">Right</option>
+                            </select>
+                        </div>
+                        <div class="propRow">
+                            <label>Style:</label>
+                            <div style="display: flex; gap: 5px;">
+                                <button class="toggleBtn" id="boldBtn" onclick="app.toggleTextStyle('bold')" style="width: auto; padding: 4px 8px; font-size: 10px;">B</button>
+                                <button class="toggleBtn" id="italicBtn" onclick="app.toggleTextStyle('italic')" style="width: auto; padding: 4px 8px; font-size: 10px; font-style: italic;">I</button>
+                                <button class="toggleBtn" id="underlineBtn" onclick="app.toggleTextStyle('underline')" style="width: auto; padding: 4px 8px; font-size: 10px; text-decoration: underline;">U</button>
+                            </div>
+                        </div>
+                        <div class="propRow">
+                            <label>Line Height:</label>
+                            <input type="range" id="lineHeight" min="1" max="2" step="0.1" value="1.5" onchange="app.updateSelectedProp('lineHeight', this.value)">
+                            <span id="lineHeightValue">1.5</span>
+                        </div>
+                        <div class="propRow">
+                            <label>Background:</label>
+                            <input type="color" id="backgroundColor" value="#ffffff" onchange="app.updateSelectedProp('backgroundColor', this.value)">
+                        </div>
+                        <div class="propRow">
+                            <label>Border:</label>
+                            <button class="toggleBtn" id="borderToggle" onclick="app.toggleTextBorder()">Enable Border</button>
+                        </div>
+                    </div>
+
+                    <!-- Tapered Line Properties -->
+                    <div id="taperedLinePropsContent" style="display: none;">
+                        <div class="propRow">
+                            <label>Base Width:</label>
+                            <input type="number" id="baseWidth" value="6" min="1" max="20" onchange="app.updateSelectedProp('baseWidth', this.value)">
+                        </div>
+                        <div class="propRow">
+                            <label>Tip Width:</label>
+                            <input type="number" id="tipWidth" value="2" min="1" max="20" onchange="app.updateSelectedProp('tipWidth', this.value)">
+                        </div>
+                        <div class="propRow">
+                            <label>Color:</label>
+                            <input type="color" id="taperedLineColor" value="#FF8A42" onchange="app.updateSelectedProp('strokeColor', this.value)">
+                        </div>
+                        <div class="propRow">
+                            <label>Type:</label>
+                            <select id="processType" onchange="app.updateSelectedProp('isDendrite', this.value === 'dendrite')">
+                                <option value="dendrite">Dendrite</option>
+                                <option value="axon">Axon</option>
+                            </select>
+                        </div>
+                        <div class="propRow">
+                            <label>Gradient:</label>
+                            <button class="toggleBtn" id="gradientToggle" onclick="app.toggleProp('showGradient')">Enabled</button>
+                        </div>
+                    </div>
+
+                    <!-- Curved Path Properties -->
+                    <div id="curvedPathPropsContent" style="display: none;">
+                        <div class="propRow">
+                            <label>Width:</label>
+                            <input type="number" id="curvedPathWidth" value="3" min="1" max="20" onchange="app.updateSelectedProp('strokeWidth', this.value)">
+                        </div>
+                        <div class="propRow">
+                            <label>Color:</label>
+                            <input type="color" id="curvedPathColor" value="#A93226" onchange="app.updateSelectedProp('strokeColor', this.value)">
+                        </div>
+                        <div class="propRow">
+                            <label>Curvature:</label>
+                            <p style="font-size: 11px; color: #666; margin: 4px 0;">Click and drag curve to adjust</p>
+                        </div>
+                    </div>
+
+                    <!-- Freehand Properties -->
+                    <div id="freehandPropsContent" style="display: none;">
+                        <div class="propRow">
+                            <label>Stroke Width:</label>
+                            <input type="number" id="freehandStrokeWidth" value="2" min="1" max="50" onchange="app.updateSelectedProp('strokeWidth', this.value)">
+                        </div>
+                        <div class="propRow">
+                            <label>Stroke Color:</label>
+                            <input type="color" id="freehandStrokeColor" value="#FFFFFF" onchange="app.updateSelectedProp('strokeColor', this.value)">
+                        </div>
+                        <div class="propRow">
+                            <label>Line Style:</label>
+                            <select id="freehandLineStyle" onchange="app.updateSelectedProp('lineStyle', this.value)">
+                                <option value="solid">Solid</option>
+                                <option value="dotted">Dotted</option>
+                                <option value="dashed">Dashed</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Image Properties -->
+                    <div id="imagePropsContent" style="display: none;">
+                        <div class="propRow">
+                            <label>Opacity:</label>
+                            <input type="range" id="imageOpacity" min="0" max="1" step="0.1" value="1" oninput="app.updateSelectedProp('opacity', this.value)">
+                            <span id="imageOpacityValue">100%</span>
+                        </div>
+                        <div class="propRow">
+                            <label>Size:</label>
+                            <p style="font-size: 11px; color: #666; margin: 4px 0;">Drag corner handles to resize</p>
+                        </div>
+                        <div class="propRow">
+                            <label>Original:</label>
+                            <span id="imageOriginalSize" style="font-size: 11px; color: #666;">-</span>
+                        </div>
+                    </div>
+
+                    <!-- Graph Properties -->
+                    <div id="graphPropsContent" style="display: none;">
+                        <div class="propRow">
+                            <label>Graph Type:</label>
+                            <select id="graphType" onchange="app.updateGraphType(this.value)">
+                                <option value="actionPotential">Action Potential</option>
+                                <option value="synaptic">Synaptic Potential</option>
+                            </select>
+                        </div>
+                        <div class="propRow">
+                            <label>Preset:</label>
+                            <select id="graphPreset" onchange="app.updateGraphPreset(this.value)">
+                                <option value="standard">Standard</option>
+                                <option value="fast">Fast</option>
+                                <option value="slow">Slow</option>
+                                <option value="cardiac">Cardiac</option>
+                            </select>
+                        </div>
+                        <div class="propRow">
+                            <label>Width:</label>
+                            <input type="number" id="graphWidth" value="400" min="200" max="800" step="50" onchange="app.updateSelectedProp('width', parseInt(this.value))">
+                        </div>
+                        <div class="propRow">
+                            <label>Height:</label>
+                            <input type="number" id="graphHeight" value="300" min="150" max="600" step="50" onchange="app.updateSelectedProp('height', parseInt(this.value))">
+                        </div>
+                        <div class="propRow">
+                            <label>Line Color:</label>
+                            <input type="color" id="graphLineColor" value="#2C3E50" onchange="app.updateSelectedProp('lineColor', this.value)">
+                        </div>
+                        <div class="propRow">
+                            <label>Line Width:</label>
+                            <input type="number" id="graphLineWidth" value="3" min="1" max="10" onchange="app.updateSelectedProp('lineWidth', parseInt(this.value))">
+                        </div>
+                        <div class="propRow">
+                            <label>Show Grid:</label>
+                            <button class="toggleBtn" id="graphGridToggle" onclick="app.toggleGraphProp('showGrid')">Enabled</button>
+                        </div>
+                        <div class="propRow">
+                            <label>Show Labels:</label>
+                            <button class="toggleBtn" id="graphLabelsToggle" onclick="app.toggleGraphProp('showLabels')">Enabled</button>
+                        </div>
+                        <div class="propRow">
+                            <label>Background:</label>
+                            <select id="graphBackground" onchange="app.updateSelectedProp('backgroundColor', this.value)">
+                                <option value="white">White</option>
+                                <option value="transparent">Transparent</option>
+                            </select>
+                        </div>
+                        <div class="propRow">
+                            <p style="font-size: 11px; color: #666; margin: 4px 0;">Drag control points on graph to modify curve shape</p>
+                        </div>
+                    </div>
+
+                </div>
+                <div class="panelSection">
+                    <h3 onclick="app.toggleShortcuts()" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
+                        <span>Shortcuts</span>
+                        <span id="shortcutArrow" style="transition: transform 0.3s;">▼</span>
+                    </h3>
+                    <div id="shortcutsList" style="display: none;">
+                        <div class="shortcut-item">
+                            <span class="shortcut-key">⌘/Ctrl+S</span>
+                            <span>Save</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-key">⌘/Ctrl+E</span>
+                            <span>Export</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-key">⌘/Ctrl+Z</span>
+                            <span>Undo</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-key">⌘/Ctrl+Shift+Z</span>
+                            <span>Redo</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-key">⌘/Ctrl+C</span>
+                            <span>Copy</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-key">⌘/Ctrl+V</span>
+                            <span>Paste</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-key">⌘/Ctrl+D</span>
+                            <span>Duplicate</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-key">⌘/Ctrl+A</span>
+                            <span>Select All</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-key">Delete/⌫</span>
+                            <span>Remove</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-key">Escape</span>
+                            <span>Deselect</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-key">Space+Drag</span>
+                            <span>Pan</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-key">⌘/Ctrl+Scroll</span>
+                            <span>Zoom</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Wait for DOM to be ready before doing anything
+        window.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const { app } = await import('./app.js');
+
+                // Make app globally available for onclick handlers
+                window.app = app;
+
+                // Initialize application
+                app.init();
+
+            } catch (error) {
+                console.error('FATAL ERROR during initialization:', error);
+                alert('NeuroSketch failed to load. Please ensure you are running this from a web server.\n\nTo fix: Run "python3 -m http.server 8000" in this directory, then open http://localhost:8000/index.html');
+            }
+        });
+    </script>
+</body>
+</html>

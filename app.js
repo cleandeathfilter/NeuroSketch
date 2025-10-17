@@ -3,28 +3,41 @@
  * Manages canvas, state, selection, and integrates with TextEditor and CanvasRenderer
  */
 
+// NEW: Core architecture systems
+import { StateMachine, InteractionState } from './src/core/StateMachine.js';
+import { ToolManager } from './src/core/ToolManager.js';
+import { CommandHistory, AddObjectCommand } from './src/core/CommandHistory.js';
+// SynapseTool removed - will rebuild later
+import { StateValidator } from './src/core/StateValidator.js';
+import {
+    initializeArchitecture,
+    switchToolWithValidation,
+    validateStateLoop,
+    getArchitectureStatus
+} from './src/core/ArchitectureIntegration.js';
+
+// NEW: Import all Tool classes
+// CORE TOOLS - Working perfectly
+import { SelectTool } from './src/tools/SelectTool.js';
+import { CircleTool } from './src/tools/CircleTool.js';
+import { RectangleTool } from './src/tools/RectangleTool.js';
+import { LineTool } from './src/tools/LineTool.js';
+import { TriangleTool } from './src/tools/TriangleTool.js';
+import { SquareTool } from './src/tools/SquareTool.js';
+import { PentagonTool } from './src/tools/PentagonTool.js';
+import { HexagonTool } from './src/tools/HexagonTool.js';
+import { HeptagonTool } from './src/tools/HeptagonTool.js';
+import { OctagonTool } from './src/tools/OctagonTool.js';
+import { NonagonTool } from './src/tools/NonagonTool.js';
+import { DecagonTool } from './src/tools/DecagonTool.js';
+import { TextTool } from './src/tools/TextTool.js';
+import { FreehandTool } from './src/tools/FreehandTool.js';
+
 import { TextEditor } from './textEditor.js';
 import { drawObject, drawSelection, drawGraphSelection } from './canvasRenderer.js';
-import { startDrawingTriangle, updateTriangle, finalizeTriangle, isPointInTriangle } from './triangleTool.js';
-import { startDrawingHexagon, updateHexagon, finalizeHexagon, isPointInHexagon } from './hexagonTool.js';
-import { startDrawingEllipse, updateEllipse, finalizeEllipse, isPointInEllipse } from './ellipseTool.js';
-import { startDrawingTaperedLine, updateTaperedLine, finalizeTaperedLine, isPointOnTaperedLine } from './taperedLineTool.js';
-import { startDrawingUnmyelinatedAxon, updateUnmyelinatedAxon, finalizeUnmyelinatedAxon, isPointOnUnmyelinatedAxon } from './unmyelinatedAxonTool.js';
-import { startDrawingMyelinatedAxon, updateMyelinatedAxon, finalizeMyelinatedAxon, isPointOnMyelinatedAxon } from './myelinatedAxonTool.js';
-import { startDrawingAxonHillock, updateAxonHillock, finalizeAxonHillock, isPointInAxonHillock, snapToSoma } from './axonHillockTool.js';
-import { startDrawingApicalDendrite, updateApicalDendrite, finalizeApicalDendrite, isPointOnApicalDendrite, snapToSomaApex } from './apicalDendriteTool.js';
-import { startDrawingBipolarSoma, updateBipolarSoma, finalizeBipolarSoma, isPointInBipolarSoma } from './bipolarSomaTool.js';
-import {
-    startDrawingGraph,
-    finalizeGraph,
-    isPointInGraph,
-    getControlPointAt,
-    updateControlPoint,
-    canvasToGraph,
-    graphToCanvas,
-    GRAPH_PRESETS,
-    applyPreset
-} from './graphTool.js';
+import { renderSynapse, renderSynapsePreview } from './synapseRenderer.js';
+import * as signalAnimation from './signalAnimation.js';
+// Circuit templates removed - will rebuild later
 
 export const app = {
     canvas: null,
@@ -32,6 +45,13 @@ export const app = {
     textEditor: null,
     objects: [],
     selectedObjects: [],
+
+    // NEW: Core architecture systems
+    stateMachine: null,
+    toolManager: null,
+    commandHistory: null,
+
+    // OLD: Keep for backward compatibility during transition
     currentTool: 'select',
     isDrawing: false,
     isPanning: false,
@@ -43,7 +63,7 @@ export const app = {
     zoom: 1,
     showGrid: false,
     dragHandle: null,
-    isDarkMode: false,
+    isDarkMode: true,
     history: [],
     historyIndex: -1,
     clipboard: null,
@@ -53,6 +73,11 @@ export const app = {
     selectionBoxEnd: null,
     isDraggingGraphControlPoint: false,
     graphControlPointIndex: null,
+    
+    // Tab cycling through overlapping objects
+    lastClickWorldPos: null,
+    objectsAtLastClick: [],
+    tabCycleIndex: 0,
     hoveredGraphPoint: null,
     tooltipTimeout: null,
     showDimensions: true,
@@ -65,6 +90,13 @@ export const app = {
     rotationStartAngle: 0,
     initialRotation: 0,
     rotationStartDistance: 0,
+    // Synapse tool state (OLD - will be removed after migration)
+    currentSynapseType: 'excitatory',
+    isPlacingSynapse: false,
+    synapsePreview: null,
+    // Animation state
+    isAnimating: false,
+    animationSpeed: 1.0,
 
     init() {
         try {
@@ -72,6 +104,39 @@ export const app = {
             this.canvas = document.getElementById('canvas');
             this.ctx = this.canvas.getContext('2d');
             this.textEditor = new TextEditor(this.canvas, this);
+
+            // NEW: Initialize core architecture systems
+            console.log('Initializing core architecture systems...');
+            this.stateMachine = new StateMachine(InteractionState.IDLE);
+            this.toolManager = new ToolManager();
+            this.commandHistory = new CommandHistory();
+
+            // Initialize integration layer (StateValidator, etc.)
+            initializeArchitecture(this);
+
+            // Boolean flags removed - state machine is now the single source of truth
+            // No sync needed - all code uses stateMachine.state directly
+
+            // Register tools with new architecture
+            console.log('Registering tools...');
+            
+            // CORE TOOLS ONLY - Working perfectly
+            this.toolManager.register(new SelectTool());
+            this.toolManager.register(new CircleTool());
+            this.toolManager.register(new RectangleTool());
+            this.toolManager.register(new LineTool());
+            this.toolManager.register(new TriangleTool());
+            this.toolManager.register(new SquareTool());
+            this.toolManager.register(new PentagonTool());
+            this.toolManager.register(new HexagonTool());
+            this.toolManager.register(new HeptagonTool());
+            this.toolManager.register(new OctagonTool());
+            this.toolManager.register(new NonagonTool());
+            this.toolManager.register(new DecagonTool());
+            this.toolManager.register(new TextTool());
+            this.toolManager.register(new FreehandTool());
+            
+            console.log(`✅ Registered ${this.toolManager.getAllTools().length} core tools - All working perfectly!`);
 
             console.log('Canvas:', this.canvas);
             this.resizeCanvas();
@@ -92,14 +157,105 @@ export const app = {
             toolButtons.forEach((btn, index) => {
                 console.log(`  Setting up button ${index}: ${btn.dataset.tool}`);
                 btn.addEventListener('click', (e) => {
-                    console.log('Tool clicked:', btn.dataset.tool);
+                    const newTool = btn.dataset.tool;
+                    if (!newTool) return; // Skip buttons without tool (like image import)
+                    
+                    console.log('🔧 Tool button clicked:', newTool);
+
+                    // Check if this is a category button - toggle dropdown instead of switching tool
+                    const category = btn.closest('.toolCategory');
+                    if (category) {
+                        e.stopPropagation();
+                        this.toggleToolDropdown(category);
+                        return;
+                    }
+
+                    // Update UI
                     document.querySelectorAll('.toolBtn').forEach(b => b.classList.remove('active'));
                     btn.classList.add('active');
-                    this.currentTool = btn.dataset.tool;
-                    console.log('Current tool set to:', this.currentTool);
-                    // CRITICAL: Reset interaction state when changing tools to prevent stuck state
+
+                    const oldTool = this.currentTool;
+                    
+                    // CRITICAL: Set tool FIRST, then reset state
+                    this.currentTool = newTool;
+                    
+                    // Reset interaction state (safe to call after tool is set)
                     this.resetInteractionState();
+                    
+                    // HYBRID SYSTEM: If tool is in new architecture, use ToolManager
+                    if (this.toolManager.hasTool(newTool)) {
+                        console.log(`  ✨ NEW architecture: ${newTool}`);
+                        this.toolManager.switchTool(newTool);
+                        this.stateMachine.transition(InteractionState.IDLE);
+                    } else {
+                        console.log(`  📦 OLD system: ${newTool}`);
+                    }
+
+                    console.log(`✅ Tool switched: ${oldTool} → ${this.currentTool}, State: ${this.stateMachine.state}`);
+                    this.render();
                 });
+            });
+
+            // Setup dropdown menu items
+            console.log('Setting up dropdown menu items...');
+            const dropdownItems = document.querySelectorAll('.dropdownItem');
+            dropdownItems.forEach(item => {
+                item.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const tool = item.dataset.tool;
+                    const category = item.closest('.toolCategory');
+                    
+                    // Update category button to show selected tool
+                    if (category) {
+                        const categoryBtn = category.querySelector('.toolBtn');
+                        const icon = item.querySelector('.icon').cloneNode(true);
+                        categoryBtn.innerHTML = '';
+                        categoryBtn.appendChild(icon);
+                        const indicator = document.createElement('div');
+                        indicator.className = 'dropdown-indicator';
+                        categoryBtn.appendChild(indicator);
+                        categoryBtn.dataset.tool = tool;
+                        
+                        // Store last-used tool for this category
+                        const categoryName = category.dataset.category;
+                        localStorage.setItem(`neurosketch-lastTool-${categoryName}`, tool);
+                    }
+                    
+                    // Switch to the selected tool
+                    this.switchTool(tool);
+                    
+                    // Close dropdown
+                    this.closeAllDropdowns();
+                });
+            });
+
+            // Close dropdowns when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('.toolCategory')) {
+                    this.closeAllDropdowns();
+                }
+            });
+
+            // Restore last-used tool for each category from localStorage
+            console.log('Restoring last-used tools from localStorage...');
+            document.querySelectorAll('.toolCategory').forEach(category => {
+                const categoryName = category.dataset.category;
+                const lastTool = localStorage.getItem(`neurosketch-lastTool-${categoryName}`);
+                
+                if (lastTool) {
+                    const dropdownItem = category.querySelector(`.dropdownItem[data-tool="${lastTool}"]`);
+                    if (dropdownItem) {
+                        const categoryBtn = category.querySelector('.toolBtn');
+                        const icon = dropdownItem.querySelector('.icon').cloneNode(true);
+                        categoryBtn.innerHTML = '';
+                        categoryBtn.appendChild(icon);
+                        const indicator = document.createElement('div');
+                        indicator.className = 'dropdown-indicator';
+                        categoryBtn.appendChild(indicator);
+                        categoryBtn.dataset.tool = lastTool;
+                        console.log(`  Restored ${categoryName}: ${lastTool}`);
+                    }
+                }
             });
 
             console.log('Initializing dimension toggle button...');
@@ -199,6 +355,13 @@ export const app = {
     switchToSelectTool() {
         // Switch to select tool and update UI
         this.currentTool = 'select';
+        
+        // CRITICAL: Also tell ToolManager to switch tools!
+        if (this.toolManager.hasTool('select')) {
+            this.toolManager.switchTool('select');
+            this.stateMachine.transition(InteractionState.IDLE);
+        }
+        
         document.querySelectorAll('.toolBtn').forEach(b => b.classList.remove('active'));
         const selectBtn = document.querySelector('[data-tool="select"]');
         if (selectBtn) {
@@ -213,6 +376,17 @@ export const app = {
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
         const world = this.screenToWorld(x, y);
+
+        console.log(`🖱️ MouseDown - Tool: ${this.currentTool}, State: ${this.stateMachine.state}, World: (${Math.round(world.x)}, ${Math.round(world.y)})`);
+
+        // Pan with spacebar + click (MUST be before tool delegation)
+        if (this.spacePressed) {
+            this.isPanning = true;
+            this.startX = x - this.panX;
+            this.startY = y - this.panY;
+            this.canvas.style.cursor = 'grabbing';
+            return;
+        }
 
         // If editing text, check if clicking outside the textbox to stop editing
         if (this.textEditor && this.textEditor.isEditing) {
@@ -234,251 +408,44 @@ export const app = {
             }
         }
 
-        // Pan with spacebar + click
-        if (this.spacePressed) {
-            this.isPanning = true;
-            this.startX = x - this.panX;
-            this.startY = y - this.panY;
-            this.canvas.style.cursor = 'grabbing';
-            return;
-        }
-
-        // SELECT TOOL
-        if (this.currentTool === 'select') {
-            // PRIORITY: Check for textbox resize handles FIRST (defensive fix)
-            // Textboxes need special handling to ensure resize works reliably
-            if (this.selectedObjects.length === 1 && this.selectedObjects[0].type === 'text') {
-                const textObj = this.selectedObjects[0];
-                const handleSize = 15 / this.zoom; // Larger hit area for easier clicking
-
-                // Calculate textbox bounds
-                const bounds = {
-                    left: textObj.x,
-                    right: textObj.x + textObj.width,
-                    top: textObj.y,
-                    bottom: textObj.y + textObj.height
-                };
-
-                // Check if click is within textbox bounds (with handle padding)
-                const padding = handleSize;
-                const clickedInTextboxArea = world.x >= bounds.left - padding &&
-                                             world.x <= bounds.right + padding &&
-                                             world.y >= bounds.top - padding &&
-                                             world.y <= bounds.bottom + padding;
-
-                if (!clickedInTextboxArea) {
-                    // Clicked outside textbox - deselect it
-                    this.selectedObjects = [];
-                    this.lastClickTime = null;
-                    this.updatePropertiesPanel();
-                    // Fall through to handle the click normally
-                } else {
-                    // Clicked inside or near textbox - handle it
-                    // Check all 8 handles explicitly for textbox
-                    const handles = {
-                        nw: {x: bounds.left, y: bounds.top},
-                        ne: {x: bounds.right, y: bounds.top},
-                        sw: {x: bounds.left, y: bounds.bottom},
-                        se: {x: bounds.right, y: bounds.bottom},
-                        n: {x: (bounds.left + bounds.right) / 2, y: bounds.top},
-                        s: {x: (bounds.left + bounds.right) / 2, y: bounds.bottom},
-                        w: {x: bounds.left, y: (bounds.top + bounds.bottom) / 2},
-                        e: {x: bounds.right, y: (bounds.top + bounds.bottom) / 2}
-                    };
-
-                    for (let [key, pos] of Object.entries(handles)) {
-                        const dx = Math.abs(world.x - pos.x);
-                        const dy = Math.abs(world.y - pos.y);
-                        if (dx < handleSize && dy < handleSize) {
-                            this.dragHandle = key;
-                            this.isDrawing = true;
-                            this.startX = world.x;
-                            this.startY = world.y;
-                            return;
-                        }
-                    }
-
-                    // Handle was not clicked, check for double-click on textbox body
-                    const now = Date.now();
-                    const timeSinceLastClick = this.lastClickTime ? (now - this.lastClickTime) : 999;
-                    const isDoubleClick = this.lastClickTime && timeSinceLastClick < 300;
-
-                    if (isDoubleClick) {
-                        this.textEditor.startEditing(textObj);
-                        this.updatePropertiesPanel();
-                        this.lastClickTime = null; // Clear to prevent triple-click issues
-                        return;
-                    }
-
-                    // Single click on textbox body - set up for move
-                    this.lastClickTime = now;
-                    this.isDrawing = true;
-                    this.startX = world.x;
-                    this.startY = world.y;
-                    textObj._dragOffsetX = world.x - textObj.x;
-                    textObj._dragOffsetY = world.y - textObj.y;
-                    return; // Don't fall through to general object handler
-                }
+        // NEW ARCHITECTURE: Delegate to Tool Manager
+        if (this.toolManager.hasTool(this.currentTool)) {
+            // Tool is in new architecture - use it exclusively
+            // Use precise mode if Ctrl is pressed
+            const preciseMode = this.ctrlPressed;
+            const clickedObj = this.getObjectAt(world.x, world.y, preciseMode);
+            const result = this.toolManager.handleMouseDown(world.x, world.y, clickedObj, this);
+            
+            if (result && result.stateTransition) {
+                this.stateMachine.transition(result.stateTransition);
             }
-
-            // Check for graph control point dragging
-            if (this.selectedObjects.length === 1 && this.selectedObjects[0].type === 'graph') {
-                const graph = this.selectedObjects[0];
-                const controlPointIndex = getControlPointAt(graph, world.x, world.y, 10 / this.zoom);
-                if (controlPointIndex !== -1) {
-                    this.isDraggingGraphControlPoint = true;
-                    this.graphControlPointIndex = controlPointIndex;
-                    this.isDrawing = true;
-                    this.startX = world.x;
-                    this.startY = world.y;
-                    return;
-                }
-            }
-
-            // Check for rotation handle (skip tapered lines/dendrites and curved paths/axons)
-            if (this.selectedObjects.length === 1 &&
-                this.selectedObjects[0].type !== 'taperedLine' &&
-                this.selectedObjects[0].type !== 'curvedPath') {
-                if (this.isClickingRotateHandle(x, y)) {
-                    const obj = this.selectedObjects[0];
-                    this.isRotating = true;
-                    this.isDrawing = true;
-                    const center = this.getObjectCenter(obj);
-                    this.rotationStartAngle = Math.atan2(world.y - center.y, world.x - center.x);
-                    this.initialRotation = obj.rotation || 0;
-
-                    // Store initial distance for proportional rotation
-                    const dx = world.x - center.x;
-                    const dy = world.y - center.y;
-                    this.rotationStartDistance = Math.sqrt(dx * dx + dy * dy);
-                    return;
-                }
-            }
-
-            // Check for resize handles on other objects (skip text, already handled above)
-            if (this.selectedObjects.length === 1 && this.selectedObjects[0].type !== 'text') {
-                const handle = this.getResizeHandle(x, y);
-                if (handle) {
-                    this.dragHandle = handle;
-                    this.isDrawing = true;
-                    this.startX = world.x;
-                    this.startY = world.y;
-                    return;
-                }
-            }
-
-            // Check if clicking on an object
-            const obj = this.getObjectAt(world.x, world.y);
-            if (obj) {
-                const now = Date.now();
-                const isDoubleClick = this.lastClickTime && (now - this.lastClickTime) < 300 && this.selectedObjects[0] === obj;
-
-                // Handle double-click on text objects to edit
-                if (obj.type === 'text' && isDoubleClick) {
-                    this.textEditor.startEditing(obj);
-                    this.updatePropertiesPanel();
-                    this.lastClickTime = null; // Clear to prevent triple-click issues
-                    return;
-                }
-
-                this.lastClickTime = now;
-
-                if (!this.selectedObjects.includes(obj)) {
-                    this.selectedObjects = [obj];
-                }
-                this.isDrawing = true;
-                this.startX = world.x;
-                this.startY = world.y;
-                // Store initial positions for all selected objects
-                this.selectedObjects.forEach(o => {
-                    if (o.type === 'taperedLine' || o.type === 'curvedPath' || o.type === 'apicalDendrite' ||
-                        o.type === 'myelinatedAxon' || o.type === 'unmyelinatedAxon') {
-                        // For line-based objects with x1/y1, store offset from first point
-                        o._dragOffsetX = world.x - o.x1;
-                        o._dragOffsetY = world.y - o.y1;
-                    } else if (o.type === 'freehand') {
-                        // For freehand, store offset from first point
-                        if (o.points && o.points.length > 0) {
-                            o._dragOffsetX = world.x - o.points[0].x;
-                            o._dragOffsetY = world.y - o.points[0].y;
-                        }
-                    } else {
-                        o._dragOffsetX = world.x - o.x;
-                        o._dragOffsetY = world.y - o.y;
-                    }
-                });
+            
+            // Some tools create objects immediately in onMouseDown (text, graph, etc.)
+            if (result && result.object) {
+                console.log(`✅ Created ${result.object.type} (immediate)`);
+                this.objects.push(result.object);
+                this.selectedObjects = [result.object];
+                this.saveState();
                 this.updatePropertiesPanel();
-            } else {
-                // Don't deselect if we just finished editing a textbox (defensive protection)
-                const hasProtectedTextbox = this.selectedObjects.length === 1 &&
-                                           this.selectedObjects[0].type === 'text' &&
-                                           this.selectedObjects[0]._justFinishedEditing;
-
-                if (!hasProtectedTextbox) {
-                    // Start selection box on empty canvas click
-                    this.isDrawingSelectionBox = true;
-                    this.selectionBoxStart = {x: world.x, y: world.y};
-                    this.selectionBoxEnd = {x: world.x, y: world.y};
-                    this.selectedObjects = [];
-                    this.lastClickTime = null;
-                    this.updatePropertiesPanel();
+                
+                // Start editing text immediately
+                if (result.object.type === 'text') {
+                    setTimeout(() => this.textEditor.startEditing(result.object), 100);
+                }
+                
+                if (this.currentTool !== 'select') {
+                    this.switchToSelectTool();
                 }
             }
-        } else if (this.currentTool === 'graph') {
-            // GRAPH TOOL - Create graph
-            startDrawingGraph(world.x, world.y);
-            const graphObj = finalizeGraph(world.x, world.y);
-            this.objects.push(graphObj);
-            this.selectedObjects = [graphObj];
-            this.saveState();
-            this.updatePropertiesPanel();
+            
             this.render();
-            // Auto-switch to select tool
-            this.switchToSelectTool();
-        } else if (this.currentTool === 'text') {
-            // TEXT TOOL - Create textbox
-            const textObj = {
-                type: 'text',
-                x: world.x,
-                y: world.y,
-                width: 200,
-                height: 50,
-                text: '',
-                fontSize: 16,
-                fontFamily: 'Arial',
-                fontWeight: 'normal',
-                fontStyle: 'normal',
-                textDecoration: 'none',
-                textColor: this.isDarkMode ? '#FFFFFF' : '#000000',
-                textAlign: 'left',
-                lineHeight: 1.5,
-                backgroundColor: 'transparent',
-                backgroundOpacity: 1,
-                hasBorder: false,
-                borderColor: this.isDarkMode ? '#FFFFFF' : '#000000',
-                borderWidth: 1,
-                borderRadius: 0,
-                rotation: 0
-            };
-            this.objects.push(textObj);
-            this.selectedObjects = [textObj];
-            this.saveState();
-            this.updatePropertiesPanel();
-            this.render();
-            // Immediately enter edit mode
-            setTimeout(() => this.textEditor.startEditing(textObj), 100);
-        } else if (this.currentTool === 'freehand') {
-            // FREEHAND DRAWING TOOL
-            this.freehandPoints = [{x: world.x, y: world.y}];
-            this.isDrawing = true;
-            this.startX = world.x;
-            this.startY = world.y;
-        } else {
-            // OTHER DRAWING TOOLS (circle, rectangle, line)
-            this.isDrawing = true;
-            this.startX = world.x;
-            this.startY = world.y;
+            return; // CRITICAL: Don't fall through to old system
         }
+
+        // ALL TOOLS NOW USE NEW ARCHITECTURE
+        // No old tool code remains - everything goes through ToolManager
+        
+        console.error('⚠️ Tool not registered in ToolManager:', this.currentTool);
 
         this.render();
     },
@@ -489,12 +456,7 @@ export const app = {
         const y = e.clientY - rect.top;
         let world = this.screenToWorld(x, y);
 
-        // Apply dimension snapping if drawing or resizing
-        if (this.isDrawing && this.currentTool !== 'select' && this.currentTool !== 'freehand') {
-            const snapped = this.applyDimensionSnapping(world.x, world.y, {x: this.startX, y: this.startY});
-            world = snapped;
-        }
-
+        // Panning with spacebar
         if (this.isPanning) {
             this.panX = x - this.startX;
             this.panY = y - this.startY;
@@ -503,216 +465,17 @@ export const app = {
             return;
         }
 
-        // Track selection box during drag
-        if (this.isDrawingSelectionBox) {
-            this.selectionBoxEnd = {x: world.x, y: world.y};
-            this.render();
-            return;
-        }
-
-        // Check for graph control point hover (for tooltips)
-        if (!this.isDrawing && this.currentTool === 'select' && this.selectedObjects.length === 1 && this.selectedObjects[0].type === 'graph') {
-            const graph = this.selectedObjects[0];
-            const pointIndex = getControlPointAt(graph, world.x, world.y, 12 / this.zoom);
-
-            if (pointIndex !== -1 && graph.curvePoints[pointIndex].type === 'anchor' && graph.curvePoints[pointIndex].tooltip) {
-                if (this.hoveredGraphPoint !== pointIndex) {
-                    this.hoveredGraphPoint = pointIndex;
-                    // Delay tooltip appearance slightly
-                    clearTimeout(this.tooltipTimeout);
-                    this.tooltipTimeout = setTimeout(() => {
-                        this.render();
-                    }, 300);
-                }
-            } else if (this.hoveredGraphPoint !== null) {
-                this.hoveredGraphPoint = null;
-                clearTimeout(this.tooltipTimeout);
+        // NEW ARCHITECTURE: Delegate to ToolManager (all tools, all states)
+        if (this.toolManager.hasTool(this.currentTool) && 
+            this.stateMachine.state !== InteractionState.IDLE) {
+            
+            const result = this.toolManager.handleMouseMove(world.x, world.y, null, this);
+            
+            if (result && result.preview) {
                 this.render();
             }
-        } else if (this.hoveredGraphPoint !== null) {
-            this.hoveredGraphPoint = null;
-            clearTimeout(this.tooltipTimeout);
-            this.render();
-        }
-
-        if (!this.isDrawing) {
-            if (this.currentTool === 'select' && this.selectedObjects.length === 1) {
-                const handle = this.getResizeHandle(x, y);
-                if (handle) {
-                    if (this.selectedObjects[0].type === 'line') {
-                        this.canvas.style.cursor = 'move';
-                    } else {
-                        this.canvas.style.cursor = handle.includes('n') || handle.includes('s') ?
-                            (handle.includes('w') || handle.includes('e') ? 'nwse-resize' : 'ns-resize') :
-                            'ew-resize';
-                    }
-                    return;
-                }
-            }
-            this.canvas.style.cursor = this.spacePressed ? 'grab' : 'default';
-            return;
-        }
-
-        if (this.currentTool === 'select' && this.selectedObjects.length > 0) {
-            if (this.isDraggingGraphControlPoint && this.selectedObjects.length === 1 && this.selectedObjects[0].type === 'graph') {
-                const graph = this.selectedObjects[0];
-                const graphPos = canvasToGraph(world.x, world.y, graph);
-                updateControlPoint(graph, this.graphControlPointIndex, graphPos.x, graphPos.y);
-            } else if (this.isRotating && this.selectedObjects.length === 1) {
-                // Handle rotation
-                const obj = this.selectedObjects[0];
-                const center = this.getObjectCenter(obj);
-                const currentAngle = Math.atan2(world.y - center.y, world.x - center.x);
-                const angleDiff = (currentAngle - this.rotationStartAngle) * 180 / Math.PI;
-                obj.rotation = this.initialRotation + angleDiff;
-
-                // Normalize rotation to 0-360 degrees
-                while (obj.rotation < 0) obj.rotation += 360;
-                while (obj.rotation >= 360) obj.rotation -= 360;
-            } else if (this.dragHandle && this.selectedObjects.length === 1) {
-                this.resizeObject(this.selectedObjects[0], world.x, world.y);
-            } else {
-                // Move all selected objects
-                const deltaX = world.x - this.startX;
-                const deltaY = world.y - this.startY;
-                this.selectedObjects.forEach(obj => {
-                    if (obj.type === 'line') {
-                        // For lines, move both endpoints
-                        obj.x = this.startX + deltaX - obj._dragOffsetX;
-                        obj.y = this.startY + deltaY - obj._dragOffsetY;
-                        obj.x2 = obj.x + obj._lineWidth;
-                        obj.y2 = obj.y + obj._lineHeight;
-                    } else if (obj.type === 'taperedLine' || obj.type === 'apicalDendrite' || obj.type === 'myelinatedAxon') {
-                        // For line-based objects with x1/y1/x2/y2, move all points
-                        const dx = world.x - obj._dragOffsetX - obj.x1;
-                        const dy = world.y - obj._dragOffsetY - obj.y1;
-                        obj.x1 += dx;
-                        obj.y1 += dy;
-                        obj.x2 += dx;
-                        obj.y2 += dy;
-                    } else if (obj.type === 'unmyelinatedAxon') {
-                        // For unmyelinated axons with control points, move all points
-                        const dx = world.x - obj._dragOffsetX - obj.x1;
-                        const dy = world.y - obj._dragOffsetY - obj.y1;
-                        obj.x1 += dx;
-                        obj.y1 += dy;
-                        obj.x2 += dx;
-                        obj.y2 += dy;
-                        obj.controlX += dx;
-                        obj.controlY += dy;
-                    } else if (obj.type === 'curvedPath') {
-                        // For curved paths, move all points
-                        const dx = world.x - obj._dragOffsetX - obj.x1;
-                        const dy = world.y - obj._dragOffsetY - obj.y1;
-                        obj.x1 += dx;
-                        obj.y1 += dy;
-                        obj.x2 += dx;
-                        obj.y2 += dy;
-                        obj.controlX += dx;
-                        obj.controlY += dy;
-                    } else if (obj.type === 'freehand') {
-                        // For freehand paths, move all points
-                        if (obj.points && obj.points.length > 0) {
-                            const dx = world.x - obj._dragOffsetX - obj.points[0].x;
-                            const dy = world.y - obj._dragOffsetY - obj.points[0].y;
-                            obj.points.forEach(point => {
-                                point.x += dx;
-                                point.y += dy;
-                            });
-                        }
-                    } else {
-                        // For all other objects including text
-                        obj.x = world.x - obj._dragOffsetX;
-                        obj.y = world.y - obj._dragOffsetY;
-                    }
-                });
-            }
-        } else if (this.currentTool === 'circle') {
-            const dx = world.x - this.startX;
-            const dy = world.y - this.startY;
-            const radius = Math.sqrt(dx * dx + dy * dy);
-            this.tempObj = {
-                type: 'circle',
-                x: this.startX,
-                y: this.startY,
-                radius: radius,
-                fillColor: 'transparent',
-                strokeColor: this.isDarkMode ? '#FFFFFF' : '#000000',
-                strokeWidth: 2
-            };
-        } else if (this.currentTool === 'rectangle') {
-            this.tempObj = {
-                type: 'rectangle',
-                x: this.startX,
-                y: this.startY,
-                width: world.x - this.startX,
-                height: world.y - this.startY,
-                fillColor: 'transparent',
-                strokeColor: this.isDarkMode ? '#FFFFFF' : '#000000',
-                strokeWidth: 2
-            };
-        } else if (this.currentTool === 'line') {
-            this.tempObj = {
-                type: 'line',
-                x: this.startX,
-                y: this.startY,
-                x2: world.x,
-                y2: world.y,
-                strokeColor: this.isDarkMode ? '#FFFFFF' : '#000000',
-                strokeWidth: 2
-            };
-        } else if (this.currentTool === 'freehand') {
-            // Capture points while drawing
-            if (this.freehandPoints && this.freehandPoints.length > 0) {
-                // Only add point if it's different from last point (avoid duplicates)
-                const lastPoint = this.freehandPoints[this.freehandPoints.length - 1];
-                const distance = Math.sqrt(
-                    Math.pow(world.x - lastPoint.x, 2) +
-                    Math.pow(world.y - lastPoint.y, 2)
-                );
-
-                // Add point if moved at least 2 pixels (reduces point density)
-                if (distance > 2 / this.zoom) {
-                    this.freehandPoints.push({x: world.x, y: world.y});
-                }
-            }
-
-            // Create temp object for rendering
-            this.tempObj = {
-                type: 'freehand',
-                points: [...this.freehandPoints],
-                strokeColor: this.isDarkMode ? '#FFFFFF' : '#000000',
-                strokeWidth: 2,
-                fillColor: 'transparent',
-                closed: false
-            };
-        } else if (this.currentTool === 'triangle') {
-            this.tempObj = startDrawingTriangle(this.startX, this.startY, this, { excitatory: '#E74C3C' });
-            updateTriangle(this.tempObj, world.x, world.y);
-        } else if (this.currentTool === 'hexagon') {
-            this.tempObj = startDrawingHexagon(this.startX, this.startY, this, { motorNeuron: '#4A90E2' });
-            updateHexagon(this.tempObj, world.x, world.y);
-        } else if (this.currentTool === 'ellipse') {
-            this.tempObj = startDrawingEllipse(this.startX, this.startY, this, { genericNeuron: '#7F8C8D' });
-            updateEllipse(this.tempObj, world.x, world.y);
-        } else if (this.currentTool === 'tapered-line') {
-            this.tempObj = startDrawingTaperedLine(this.startX, this.startY, this, { dendriteColor: '#FF8A42' });
-            updateTaperedLine(this.tempObj, world.x, world.y);
-        } else if (this.currentTool === 'unmyelinated-axon') {
-            this.tempObj = startDrawingUnmyelinatedAxon(this.startX, this.startY, this, { axonColor: '#A93226' });
-            updateUnmyelinatedAxon(this.tempObj, world.x, world.y, 1);
-        } else if (this.currentTool === 'myelinated-axon') {
-            this.tempObj = startDrawingMyelinatedAxon(this.startX, this.startY, this, {});
-            updateMyelinatedAxon(this.tempObj, world.x, world.y);
-        } else if (this.currentTool === 'axon-hillock') {
-            this.tempObj = startDrawingAxonHillock(this.startX, this.startY, this, { hillockColor: '#D98880' });
-            updateAxonHillock(this.tempObj, world.x, world.y);
-        } else if (this.currentTool === 'apical-dendrite') {
-            this.tempObj = startDrawingApicalDendrite(this.startX, this.startY, this, { apicalColor: '#E67E22' });
-            updateApicalDendrite(this.tempObj, world.x, world.y);
-        } else if (this.currentTool === 'bipolar-soma') {
-            this.tempObj = startDrawingBipolarSoma(this.startX, this.startY, this, { bipolarColor: '#9B59B6' });
-            updateBipolarSoma(this.tempObj, world.x, world.y);
+            
+            return; // Don't fall through
         }
 
         this.render();
@@ -722,83 +485,51 @@ export const app = {
         // CRITICAL FIX: Always reset state flags to prevent select tool from getting stuck
         // This ensures the select tool works reliably even if actions are interrupted
 
+        const rect = this.canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        const world = this.screenToWorld(x, y);
+
+        // Handle panning release BEFORE tool delegation
         if (this.isPanning) {
             this.isPanning = false;
             this.canvas.style.cursor = this.spacePressed ? 'grab' : 'default';
             return;
         }
 
-        // Finalize selection box
-        if (this.isDrawingSelectionBox) {
-            const boxBounds = {
-                left: Math.min(this.selectionBoxStart.x, this.selectionBoxEnd.x),
-                right: Math.max(this.selectionBoxStart.x, this.selectionBoxEnd.x),
-                top: Math.min(this.selectionBoxStart.y, this.selectionBoxEnd.y),
-                bottom: Math.max(this.selectionBoxStart.y, this.selectionBoxEnd.y)
-            };
-
-            // Find all objects that intersect with selection box
-            this.selectedObjects = this.objects.filter(obj =>
-                this.rectangleIntersectsObject(boxBounds, obj)
-            );
-
-            // Clear selection box state
-            this.selectionBoxStart = null;
-            this.selectionBoxEnd = null;
-
-            this.updatePropertiesPanel();
-
-            // Reset all interaction states (will be called again at end, but needed here for early return)
-            this.resetInteractionState();
+        // NEW ARCHITECTURE: Delegate to ToolManager (all tools, all states)
+        if (this.toolManager.hasTool(this.currentTool)) {
+            const clickedObj = this.getObjectAt(world.x, world.y);
+            const result = this.toolManager.handleMouseUp(world.x, world.y, clickedObj, this);
+            
+            if (result && result.stateTransition) {
+                this.stateMachine.transition(result.stateTransition);
+            }
+            
+            if (result && result.object) {
+                console.log(`✅ Created ${result.object.type}`, result.object);
+                this.objects.push(result.object);
+                console.log(`   Total objects now: ${this.objects.length}`);
+                this.selectedObjects = [result.object];
+                this.saveState();
+                this.updatePropertiesPanel();
+                
+                // Start editing text immediately
+                if (result.object.type === 'text') {
+                    setTimeout(() => this.textEditor.startEditing(result.object), 100);
+                }
+                
+                if (this.currentTool !== 'select') {
+                    this.switchToSelectTool();
+                }
+            } else {
+                console.log(`⚠️ No object returned from ${this.currentTool}`, result);
+            }
+            
             this.render();
             return;
         }
 
-        if (this.isDrawing && this.currentTool !== 'select' && this.currentTool !== 'text' && this.tempObj) {
-            // Finalize specific object types
-            if (this.tempObj.type === 'line') {
-                // Store line dimensions for moving
-                this.tempObj._lineWidth = this.tempObj.x2 - this.tempObj.x;
-                this.tempObj._lineHeight = this.tempObj.y2 - this.tempObj.y;
-            } else if (this.tempObj.type === 'triangle') {
-                finalizeTriangle(this.tempObj);
-            } else if (this.tempObj.type === 'hexagon') {
-                finalizeHexagon(this.tempObj);
-            } else if (this.tempObj.type === 'ellipse') {
-                finalizeEllipse(this.tempObj);
-            } else if (this.tempObj.type === 'taperedLine') {
-                finalizeTaperedLine(this.tempObj);
-            } else if (this.tempObj.type === 'unmyelinatedAxon') {
-                finalizeUnmyelinatedAxon(this.tempObj);
-            } else if (this.tempObj.type === 'myelinatedAxon') {
-                finalizeMyelinatedAxon(this.tempObj);
-            } else if (this.tempObj.type === 'axonHillock') {
-                finalizeAxonHillock(this.tempObj);
-                // Snap to nearest soma
-                const somas = this.objects.filter(o => o.type === 'triangle' || o.type === 'hexagon' || o.type === 'circle');
-                snapToSoma(this.tempObj, somas);
-            } else if (this.tempObj.type === 'apicalDendrite') {
-                finalizeApicalDendrite(this.tempObj);
-                // Snap to nearest pyramidal soma apex
-                const pyramids = this.objects.filter(o => o.type === 'triangle');
-                snapToSomaApex(this.tempObj, pyramids);
-            } else if (this.tempObj.type === 'bipolarSoma') {
-                finalizeBipolarSoma(this.tempObj);
-            } else if (this.tempObj.type === 'freehand') {
-                // Freehand path is already finalized, just need to clean up
-                // Keep all the captured points
-            }
-
-            this.objects.push(this.tempObj);
-            this.tempObj = null;
-            this.freehandPoints = []; // Clear freehand points
-            this.saveState();
-
-            // Auto-switch to select tool after drawing
-            this.switchToSelectTool();
-        } else if (this.isDrawing && this.currentTool === 'select') {
-            this.saveState();
-        }
 
         // CRITICAL FIX: Comprehensive state reset to prevent select tool from getting stuck
         // This ensures ALL interaction state flags are properly cleared after every mouse up
@@ -807,15 +538,11 @@ export const app = {
     },
 
     resetInteractionState() {
-        // Centralized method to reset all interaction state flags
-        // This prevents the select tool from getting stuck in a "drawing" or "dragging" state
-        this.isDrawing = false;
-        this.dragHandle = null;
-        this.isDraggingGraphControlPoint = false;
-        this.graphControlPointIndex = null;
-        this.isRotating = false;
-        this.isDrawingSelectionBox = false;
-        // Note: We don't reset isPanning here as it's handled separately
+        // Reset active tool state
+        if (this.toolManager && this.toolManager.activeTool) {
+            this.toolManager.activeTool.reset();
+        }
+        // State machine handles all state - no boolean flags to reset
     },
 
     handleWheel(e) {
@@ -862,32 +589,84 @@ export const app = {
             return;
         }
 
-        // T key - Switch to triangle tool (pyramidal neuron soma)
-        if (e.key === 't' || e.key === 'T') {
-            if (!this.textEditor.isEditing && !this.isEditingInput()) {
-                e.preventDefault();
-                document.querySelectorAll('.toolBtn').forEach(b => b.classList.remove('active'));
-                const triangleBtn = document.querySelector('[data-tool="triangle"]');
-                if (triangleBtn) {
-                    triangleBtn.classList.add('active');
-                    this.currentTool = 'triangle';
-                    this.resetInteractionState();
+        // Tab - Cycle through overlapping objects
+        if (e.key === 'Tab' && !this.textEditor.isEditing && !this.isEditingInput()) {
+            e.preventDefault();
+            
+            // Only works if we have a last click position and objects there
+            if (this.lastClickWorldPos && this.objectsAtLastClick.length > 1) {
+                // Cycle to next object
+                this.tabCycleIndex = (this.tabCycleIndex + 1) % this.objectsAtLastClick.length;
+                const newSelection = this.objectsAtLastClick[this.tabCycleIndex];
+                
+                this.selectedObjects = [newSelection];
+                this.updatePropertiesPanel();
+                this.render();
+                
+                console.log(`🔄 Tab cycle: ${this.tabCycleIndex + 1} of ${this.objectsAtLastClick.length} (${newSelection.type})`);
+            } else if (this.selectedObjects.length === 1) {
+                // Get objects at the selected object's center
+                const obj = this.selectedObjects[0];
+                const center = this.getObjectCenter(obj);
+                this.objectsAtLastClick = this.getAllObjectsAt(center.x, center.y, false);
+                
+                if (this.objectsAtLastClick.length > 1) {
+                    this.lastClickWorldPos = center;
+                    this.tabCycleIndex = this.objectsAtLastClick.indexOf(obj);
+                    
+                    // Cycle to next
+                    this.tabCycleIndex = (this.tabCycleIndex + 1) % this.objectsAtLastClick.length;
+                    const newSelection = this.objectsAtLastClick[this.tabCycleIndex];
+                    
+                    this.selectedObjects = [newSelection];
+                    this.updatePropertiesPanel();
+                    this.render();
+                    
+                    console.log(`🔄 Tab cycle: ${this.tabCycleIndex + 1} of ${this.objectsAtLastClick.length} (${newSelection.type})`);
                 }
+            }
+            return;
+        }
+
+        // Tool keyboard shortcuts (only when not editing text)
+        if (!this.textEditor.isEditing && !this.isEditingInput() && !cmdOrCtrl) {
+            const toolShortcuts = {
+                'v': 'select',
+                'r': 'rectangle',
+                'c': 'circle',
+                'l': 'line',
+                '3': 'triangle',
+                '4': 'square',
+                '5': 'pentagon',
+                '6': 'hexagon',
+                '7': 'heptagon',
+                '8': 'octagon',
+                '9': 'nonagon',
+                '0': 'decagon',
+                'f': 'freehand',
+                't': 'text'
+            };
+            
+            const tool = toolShortcuts[e.key.toLowerCase()];
+            if (tool) {
+                e.preventDefault();
+                this.switchTool(tool);
                 return;
             }
         }
 
-        // G key - Switch to graph tool
-        if (e.key === 'g' || e.key === 'G') {
-            if (!this.textEditor.isEditing && !this.isEditingInput()) {
+        // S key - Cycle synapse connection style (curved → straight → elbow)
+        if (e.key === 's' && !cmdOrCtrl && !this.textEditor.isEditing && !this.isEditingInput()) {
+            if (this.selectedObjects.length === 1 && this.selectedObjects[0].type === 'synapse') {
                 e.preventDefault();
-                document.querySelectorAll('.toolBtn').forEach(b => b.classList.remove('active'));
-                const graphBtn = document.querySelector('[data-tool="graph"]');
-                if (graphBtn) {
-                    graphBtn.classList.add('active');
-                    this.currentTool = 'graph';
-                    this.resetInteractionState();
-                }
+                const synapse = this.selectedObjects[0];
+                const styles = ['curved', 'straight', 'elbow'];
+                const currentIndex = styles.indexOf(synapse.connectionStyle);
+                const nextIndex = (currentIndex + 1) % styles.length;
+                synapse.connectionStyle = styles[nextIndex];
+                console.log(`Synapse style: ${synapse.connectionStyle}`);
+                this.saveState();
+                this.render();
                 return;
             }
         }
@@ -999,20 +778,235 @@ export const app = {
         }
     },
 
-    getObjectAt(x, y) {
-        // Use bounding box selection for all objects (matches dotted selection box)
+    getObjectAt(x, y, preciseMode = false) {
+        // preciseMode: Ctrl+Click - only hit actual strokes/fills, not bounding boxes
         for (let i = this.objects.length - 1; i >= 0; i--) {
             const obj = this.objects[i];
-            const bounds = this.getObjectBounds(obj);
+            
+            if (preciseMode) {
+                if (this.isPreciseHit(obj, x, y)) {
+                    return obj;
+                }
+            } else {
+                // Normal mode: bounding box selection
+                const bounds = this.getObjectBounds(obj);
+                if (!bounds) continue;
 
-            if (!bounds) continue;
+                // Handle rotated objects by transforming click to local space
+                let testX = x;
+                let testY = y;
+                
+                if (obj.rotation && obj.rotation !== 0) {
+                    const center = this.getObjectCenter(obj);
+                    const angle = -obj.rotation * Math.PI / 180; // Inverse rotation
+                    
+                    // Rotate click point into object's local space
+                    const dx = x - center.x;
+                    const dy = y - center.y;
+                    testX = center.x + dx * Math.cos(angle) - dy * Math.sin(angle);
+                    testY = center.y + dx * Math.sin(angle) + dy * Math.cos(angle);
+                }
 
-            // Simple bounding box check - click anywhere within the dotted box
-            if (x >= bounds.left && x <= bounds.right && y >= bounds.top && y <= bounds.bottom) {
-                return obj;
+                // Special handling for freehand - check if click is near the path
+                if (obj.type === 'freehand') {
+                    if (!obj.points || obj.points.length < 2) continue;
+                    
+                    // First check bounding box
+                    if (testX < bounds.left || testX > bounds.right || testY < bounds.top || testY > bounds.bottom) {
+                        continue;
+                    }
+                    
+                    // Then check distance to path segments
+                    const tolerance = (obj.strokeWidth || 2) + 5; // Click tolerance around stroke
+                    let nearPath = false;
+                    
+                    for (let j = 0; j < obj.points.length - 1; j++) {
+                        const p1 = obj.points[j];
+                        const p2 = obj.points[j + 1];
+                        const dist = this.pointToLineDistance(testX, testY, p1.x, p1.y, p2.x, p2.y);
+                        if (dist < tolerance) {
+                            nearPath = true;
+                            break;
+                        }
+                    }
+                    
+                    if (nearPath) {
+                        return obj;
+                    }
+                } else {
+                    // Simple bounding box check for other objects - click anywhere within the dotted box
+                    if (testX >= bounds.left && testX <= bounds.right && testY >= bounds.top && testY <= bounds.bottom) {
+                        return obj;
+                    }
+                }
             }
         }
         return null;
+    },
+
+    getAllObjectsAt(x, y, preciseMode = false) {
+        // Returns ALL objects at this position (for Tab cycling)
+        const objects = [];
+        for (let i = this.objects.length - 1; i >= 0; i--) {
+            const obj = this.objects[i];
+            
+            if (preciseMode) {
+                if (this.isPreciseHit(obj, x, y)) {
+                    objects.push(obj);
+                }
+            } else {
+                // Normal mode: bounding box selection
+                const bounds = this.getObjectBounds(obj);
+                if (!bounds) continue;
+
+                // Handle rotated objects by transforming click to local space
+                let testX = x;
+                let testY = y;
+                
+                if (obj.rotation && obj.rotation !== 0) {
+                    const center = this.getObjectCenter(obj);
+                    const angle = -obj.rotation * Math.PI / 180;
+                    const dx = x - center.x;
+                    const dy = y - center.y;
+                    testX = center.x + dx * Math.cos(angle) - dy * Math.sin(angle);
+                    testY = center.y + dx * Math.sin(angle) + dy * Math.cos(angle);
+                }
+
+                if (obj.type === 'freehand') {
+                    if (!obj.points || obj.points.length < 2) continue;
+                    if (testX < bounds.left || testX > bounds.right || testY < bounds.top || testY > bounds.bottom) {
+                        continue;
+                    }
+                    const tolerance = (obj.strokeWidth || 2) + 5;
+                    for (let j = 0; j < obj.points.length - 1; j++) {
+                        const p1 = obj.points[j];
+                        const p2 = obj.points[j + 1];
+                        const dist = this.pointToLineDistance(testX, testY, p1.x, p1.y, p2.x, p2.y);
+                        if (dist < tolerance) {
+                            objects.push(obj);
+                            break;
+                        }
+                    }
+                } else {
+                    if (testX >= bounds.left && testX <= bounds.right && testY >= bounds.top && testY <= bounds.bottom) {
+                        objects.push(obj);
+                    }
+                }
+            }
+        }
+        return objects;
+    },
+
+    isPreciseHit(obj, x, y) {
+        // Precise hit detection - only hit actual strokes/edges/fills
+        const tolerance = (obj.strokeWidth || 2) + 3; // Small tolerance for strokes
+        
+        // Handle rotation
+        let testX = x;
+        let testY = y;
+        if (obj.rotation && obj.rotation !== 0) {
+            const center = this.getObjectCenter(obj);
+            const angle = -obj.rotation * Math.PI / 180;
+            const dx = x - center.x;
+            const dy = y - center.y;
+            testX = center.x + dx * Math.cos(angle) - dy * Math.sin(angle);
+            testY = center.y + dx * Math.sin(angle) + dy * Math.cos(angle);
+        }
+        
+        switch (obj.type) {
+            case 'circle': {
+                const dist = Math.sqrt((testX - obj.x) ** 2 + (testY - obj.y) ** 2);
+                const hasFill = obj.fillColor && obj.fillColor !== 'transparent';
+                if (hasFill && dist <= obj.radius) return true; // Inside fill
+                // Check stroke
+                return Math.abs(dist - obj.radius) <= tolerance;
+            }
+            
+            case 'rectangle': {
+                const left = obj.x - obj.width / 2;
+                const right = obj.x + obj.width / 2;
+                const top = obj.y - obj.height / 2;
+                const bottom = obj.y + obj.height / 2;
+                
+                const hasFill = obj.fillColor && obj.fillColor !== 'transparent';
+                if (hasFill && testX >= left && testX <= right && testY >= top && testY <= bottom) {
+                    return true; // Inside fill
+                }
+                
+                // Check edges
+                if (testX >= left - tolerance && testX <= right + tolerance &&
+                    testY >= top - tolerance && testY <= bottom + tolerance) {
+                    // Near perimeter?
+                    const nearLeft = Math.abs(testX - left) <= tolerance;
+                    const nearRight = Math.abs(testX - right) <= tolerance;
+                    const nearTop = Math.abs(testY - top) <= tolerance;
+                    const nearBottom = Math.abs(testY - bottom) <= tolerance;
+                    return nearLeft || nearRight || nearTop || nearBottom;
+                }
+                return false;
+            }
+            
+            case 'line': {
+                const dist = this.pointToLineDistance(testX, testY, obj.x, obj.y, obj.x2, obj.y2);
+                return dist <= tolerance;
+            }
+            
+            case 'polygon': {
+                const hasFill = obj.fillColor && obj.fillColor !== 'transparent';
+                
+                // Generate polygon points
+                const points = [];
+                for (let i = 0; i < obj.sides; i++) {
+                    const angle = (i * 2 * Math.PI / obj.sides) - Math.PI / 2;
+                    points.push({
+                        x: obj.x + obj.radius * Math.cos(angle),
+                        y: obj.y + obj.radius * Math.sin(angle)
+                    });
+                }
+                
+                // Check if inside polygon (for fill)
+                if (hasFill) {
+                    let inside = false;
+                    for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+                        const xi = points[i].x, yi = points[i].y;
+                        const xj = points[j].x, yj = points[j].y;
+                        const intersect = ((yi > testY) !== (yj > testY)) &&
+                            (testX < (xj - xi) * (testY - yi) / (yj - yi) + xi);
+                        if (intersect) inside = !inside;
+                    }
+                    if (inside) return true;
+                }
+                
+                // Check edges
+                for (let i = 0; i < points.length; i++) {
+                    const p1 = points[i];
+                    const p2 = points[(i + 1) % points.length];
+                    const dist = this.pointToLineDistance(testX, testY, p1.x, p1.y, p2.x, p2.y);
+                    if (dist <= tolerance) return true;
+                }
+                return false;
+            }
+            
+            case 'freehand': {
+                if (!obj.points || obj.points.length < 2) return false;
+                for (let j = 0; j < obj.points.length - 1; j++) {
+                    const p1 = obj.points[j];
+                    const p2 = obj.points[j + 1];
+                    const dist = this.pointToLineDistance(testX, testY, p1.x, p1.y, p2.x, p2.y);
+                    if (dist <= tolerance) return true;
+                }
+                return false;
+            }
+            
+            case 'text': {
+                // Text is always bounding box (can't hit individual letters precisely)
+                return testX >= obj.x && testX <= obj.x + obj.width &&
+                       testY >= obj.y && testY <= obj.y + obj.height;
+            }
+            
+            default:
+                return false;
+        }
     },
 
     pointToLineDistance(px, py, x1, y1, x2, y2) {
@@ -1065,9 +1059,13 @@ export const app = {
             // For lines, create handles at both endpoints
             const world = this.screenToWorld(sx, sy);
 
+            // Support both {x, y, x2, y2} (old) and {x1, y1, x2, y2} (new)
+            const x1 = obj.x1 !== undefined ? obj.x1 : obj.x;
+            const y1 = obj.y1 !== undefined ? obj.y1 : obj.y;
+
             // Check start point
-            const dx1 = Math.abs(world.x - obj.x);
-            const dy1 = Math.abs(world.y - obj.y);
+            const dx1 = Math.abs(world.x - x1);
+            const dy1 = Math.abs(world.y - y1);
             if (dx1 < handleSize && dy1 < handleSize) {
                 return 'start';
             }
@@ -1087,7 +1085,7 @@ export const app = {
                 top: obj.y - obj.height / 2,
                 bottom: obj.y + obj.height / 2
             };
-        } else if (obj.type === 'hexagon') {
+        } else if (obj.type === 'hexagon' || obj.type === 'polygon') {
             bounds = {
                 left: obj.x - obj.radius,
                 right: obj.x + obj.radius,
@@ -1103,14 +1101,6 @@ export const app = {
             };
         } else if (obj.type === 'triangle') {
             // Triangle needs standard 8-handle resize
-            bounds = {
-                left: obj.x - obj.width / 2,
-                right: obj.x + obj.width / 2,
-                top: obj.y - obj.height / 2,
-                bottom: obj.y + obj.height / 2
-            };
-        } else if (obj.type === 'hexagon') {
-            // Hexagon needs standard 8-handle resize
             bounds = {
                 left: obj.x - obj.radius,
                 right: obj.x + obj.radius,
@@ -1251,6 +1241,25 @@ export const app = {
             }
 
             return null;
+        } else if (obj.type === 'synapse') {
+            // For synapses, create handles at source and target points for reconnection
+            const world = this.screenToWorld(sx, sy);
+
+            // Check source point
+            const dxSource = Math.abs(world.x - obj.sourcePoint.x);
+            const dySource = Math.abs(world.y - obj.sourcePoint.y);
+            if (dxSource < handleSize && dySource < handleSize) {
+                return 'source';
+            }
+
+            // Check target point
+            const dxTarget = Math.abs(world.x - obj.targetPoint.x);
+            const dyTarget = Math.abs(world.y - obj.targetPoint.y);
+            if (dxTarget < handleSize && dyTarget < handleSize) {
+                return 'target';
+            }
+
+            return null;
         } else if (obj.type === 'bipolarSoma') {
             // For bipolar somas, use standard 8 corner/edge handles
             const hw = obj.width / 2;
@@ -1339,11 +1348,14 @@ export const app = {
                 bottom: Math.max(obj.y, obj.y + obj.height)
             };
         } else if (obj.type === 'line' || obj.type === 'taperedLine') {
+            // Support both {x, y, x2, y2} (old) and {x1, y1, x2, y2} (new)
+            const x1 = obj.x1 !== undefined ? obj.x1 : obj.x;
+            const y1 = obj.y1 !== undefined ? obj.y1 : obj.y;
             return {
-                left: Math.min(obj.x, obj.x2 || obj.x),
-                right: Math.max(obj.x, obj.x2 || obj.x),
-                top: Math.min(obj.y, obj.y2 || obj.y),
-                bottom: Math.max(obj.y, obj.y2 || obj.y)
+                left: Math.min(x1, obj.x2 || x1),
+                right: Math.max(x1, obj.x2 || x1),
+                top: Math.min(y1, obj.y2 || y1),
+                bottom: Math.max(y1, obj.y2 || y1)
             };
         } else if (obj.type === 'triangle') {
             return {
@@ -1352,7 +1364,7 @@ export const app = {
                 top: obj.y - obj.height / 2,
                 bottom: obj.y + obj.height / 2
             };
-        } else if (obj.type === 'hexagon') {
+        } else if (obj.type === 'hexagon' || obj.type === 'polygon') {
             return {
                 left: obj.x - obj.radius,
                 right: obj.x + obj.radius,
@@ -1411,11 +1423,15 @@ export const app = {
             };
         } else if (obj.type === 'freehand') {
             const bounds = this.getFreehandBounds(obj);
+            return bounds; // Already returns {left, right, top, bottom}
+        } else if (obj.type === 'synapse') {
+            // Synapse bounds based on source and target points
+            const tolerance = 10; //Clickable area around synapse line
             return {
-                left: bounds.x,
-                right: bounds.x + bounds.width,
-                top: bounds.y,
-                bottom: bounds.y + bounds.height
+                left: Math.min(obj.sourcePoint.x, obj.targetPoint.x) - tolerance,
+                right: Math.max(obj.sourcePoint.x, obj.targetPoint.x) + tolerance,
+                top: Math.min(obj.sourcePoint.y, obj.targetPoint.y) - tolerance,
+                bottom: Math.max(obj.sourcePoint.y, obj.targetPoint.y) + tolerance
             };
         }
         return null;
@@ -1425,9 +1441,12 @@ export const app = {
         if (obj.type === 'circle') {
             return { x: obj.x, y: obj.y };
         } else if (obj.type === 'line' || obj.type === 'taperedLine' || obj.type === 'myelinatedAxon' || obj.type === 'apicalDendrite') {
+            // Support both {x, y, x2, y2} (old) and {x1, y1, x2, y2} (new)
+            const x1 = obj.x1 !== undefined ? obj.x1 : obj.x;
+            const y1 = obj.y1 !== undefined ? obj.y1 : obj.y;
             return {
-                x: (obj.x + (obj.x2 || obj.x1 || obj.x)) / 2,
-                y: (obj.y + (obj.y2 || obj.y1 || obj.y)) / 2
+                x: (x1 + obj.x2) / 2,
+                y: (y1 + obj.y2) / 2
             };
         } else if (obj.type === 'unmyelinatedAxon') {
             // Center is the midpoint of start and end
@@ -1452,12 +1471,73 @@ export const app = {
                 x: bounds.x + bounds.width / 2,
                 y: bounds.y + bounds.height / 2
             };
+        } else if (obj.type === 'synapse') {
+            // Center of synapse is midpoint of source and target
+            return {
+                x: (obj.sourcePoint.x + obj.targetPoint.x) / 2,
+                y: (obj.sourcePoint.y + obj.targetPoint.y) / 2
+            };
         } else {
             return {
                 x: obj.x + (obj.width || 0) / 2,
                 y: obj.y + (obj.height || 0) / 2
             };
         }
+    },
+
+    calculateSynapseAttachmentPoint(obj, clickX, clickY, role) {
+        // Calculate smart attachment point based on object type
+        // role: 'source' (presynaptic) or 'target' (postsynaptic)
+
+        if (obj.type === 'circle') {
+            // Attach to closest point on perimeter
+            const dx = clickX - obj.x;
+            const dy = clickY - obj.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            if (distance === 0) {
+                return { x: obj.x + obj.radius, y: obj.y };
+            }
+            return {
+                x: obj.x + (dx / distance) * obj.radius,
+                y: obj.y + (dy / distance) * obj.radius
+            };
+        } else if (obj.type === 'rectangle' || obj.type === 'text') {
+            // Attach to closest edge
+            const bounds = this.getObjectBounds(obj);
+            // Find closest edge and return point on that edge
+            const centerX = (bounds.left + bounds.right) / 2;
+            const centerY = (bounds.top + bounds.bottom) / 2;
+            const dx = clickX - centerX;
+            const dy = clickY - centerY;
+
+            // Determine which edge is closest
+            if (Math.abs(dx / (bounds.right - bounds.left)) > Math.abs(dy / (bounds.bottom - bounds.top))) {
+                // Left or right edge
+                return {
+                    x: dx > 0 ? bounds.right : bounds.left,
+                    y: clickY
+                };
+            } else {
+                // Top or bottom edge
+                return {
+                    x: clickX,
+                    y: dy > 0 ? bounds.bottom : bounds.top
+                };
+            }
+        } else if (obj.type === 'line' || obj.type === 'taperedLine' || obj.type === 'myelinatedAxon') {
+            // Attach to nearest endpoint
+            const dist1 = Math.hypot(clickX - (obj.x || obj.x1), clickY - (obj.y || obj.y1));
+            const dist2 = Math.hypot(clickX - (obj.x2 || obj.x), clickY - (obj.y2 || obj.y));
+
+            if (dist1 < dist2) {
+                return { x: obj.x || obj.x1, y: obj.y || obj.y1 };
+            } else {
+                return { x: obj.x2 || obj.x, y: obj.y2 || obj.y };
+            }
+        }
+
+        // Default: use click point
+        return { x: clickX, y: clickY };
     },
 
     resizeObject(obj, wx, wy) {
@@ -1520,30 +1600,16 @@ export const app = {
         } else if (obj.type === 'line') {
             // Change orientation by moving endpoints
             if (this.dragHandle === 'start') {
-                obj.x = wx;
-                obj.y = wy;
+                obj.x1 = wx;
+                obj.y1 = wy;
             } else if (this.dragHandle === 'end') {
                 obj.x2 = wx;
                 obj.y2 = wy;
             }
             // Update stored dimensions
-            obj._lineWidth = obj.x2 - obj.x;
-            obj._lineHeight = obj.y2 - obj.y;
-        } else if (obj.type === 'triangle') {
-            const handle = this.dragHandle;
-            const dx = wx - obj.x;
-            const dy = wy - obj.y;
-
-            if (handle.includes('e') || handle.includes('w')) {
-                obj.width = Math.abs(dx) * 2;
-            }
-            if (handle.includes('n') || handle.includes('s')) {
-                obj.height = Math.abs(dy) * 2;
-            }
-            // Maintain minimum size
-            obj.width = Math.max(obj.width, 20);
-            obj.height = Math.max(obj.height, 20);
-        } else if (obj.type === 'hexagon') {
+            obj._lineWidth = obj.x2 - obj.x1;
+            obj._lineHeight = obj.y2 - obj.y1;
+        } else if (obj.type === 'triangle' || obj.type === 'hexagon' || obj.type === 'polygon') {
             const dx = wx - obj.x;
             const dy = wy - obj.y;
             obj.radius = Math.sqrt(dx * dx + dy * dy);
@@ -1560,6 +1626,33 @@ export const app = {
             // Maintain minimum size
             obj.radiusX = Math.max(obj.radiusX, 10);
             obj.radiusY = Math.max(obj.radiusY, 10);
+        } else if (obj.type === 'synapse') {
+            // Move endpoints and check for reconnection
+            if (this.dragHandle === 'source') {
+                obj.sourcePoint.x = wx;
+                obj.sourcePoint.y = wy;
+
+                // Check if endpoint is over a valid object for reconnection
+                const targetObj = this.getObjectAt(wx, wy);
+                if (targetObj && targetObj !== obj && targetObj.type !== 'synapse') {
+                    // Reconnect to new object
+                    obj.sourceObj = targetObj;
+                    // Recalculate attachment point based on object type
+                    obj.sourcePoint = this.calculateSynapseAttachmentPoint(targetObj, wx, wy, 'source');
+                }
+            } else if (this.dragHandle === 'target') {
+                obj.targetPoint.x = wx;
+                obj.targetPoint.y = wy;
+
+                // Check if endpoint is over a valid object for reconnection
+                const targetObj = this.getObjectAt(wx, wy);
+                if (targetObj && targetObj !== obj && targetObj.type !== 'synapse') {
+                    // Reconnect to new object
+                    obj.targetObj = targetObj;
+                    // Recalculate attachment point based on object type
+                    obj.targetPoint = this.calculateSynapseAttachmentPoint(targetObj, wx, wy, 'target');
+                }
+            }
         } else if (obj.type === 'taperedLine') {
             // Move endpoints
             if (this.dragHandle === 'start') {
@@ -1960,6 +2053,9 @@ export const app = {
     },
 
     render() {
+        // NEW: Continuous defensive state validation (runs every 60 frames)
+        validateStateLoop(this);
+
         this.ctx.save();
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
@@ -2005,27 +2101,7 @@ export const app = {
             drawObject(this.ctx, obj, editingObj, this.zoom, this.isDarkMode);
         });
 
-        // Draw temp object
-        if (this.tempObj) {
-            drawObject(this.ctx, this.tempObj, editingObj, this.zoom, this.isDarkMode);
-
-            // Show dimensions while drawing
-            if (this.isDrawing && this.tempObj.type !== 'freehand') {
-                let width, height;
-                if (this.tempObj.type === 'line' || this.tempObj.type === 'taperedLine') {
-                    width = this.tempObj.x2 - this.tempObj.x;
-                    height = this.tempObj.y2 - this.tempObj.y;
-                } else if (this.tempObj.type === 'circle') {
-                    width = this.tempObj.radius * 2;
-                    height = this.tempObj.radius * 2;
-                } else {
-                    width = this.tempObj.width || 0;
-                    height = this.tempObj.height || 0;
-                }
-
-                this.drawDimensionLabel(this.tempObj.x, this.tempObj.y, width, height, this.tempObj.type);
-            }
-        }
+        // Tools handle their own preview rendering via renderPreview()
 
         // Draw selection (skip objects being edited)
         this.selectedObjects.forEach(obj => {
@@ -2059,23 +2135,9 @@ export const app = {
             }
         });
 
-        // Draw selection box if active
-        if (this.isDrawingSelectionBox && this.selectionBoxStart && this.selectionBoxEnd) {
-            const x1 = Math.min(this.selectionBoxStart.x, this.selectionBoxEnd.x);
-            const y1 = Math.min(this.selectionBoxStart.y, this.selectionBoxEnd.y);
-            const x2 = Math.max(this.selectionBoxStart.x, this.selectionBoxEnd.x);
-            const y2 = Math.max(this.selectionBoxStart.y, this.selectionBoxEnd.y);
-            const width = x2 - x1;
-            const height = y2 - y1;
-
-            this.ctx.save();
-            this.ctx.setLineDash([5 / this.zoom, 5 / this.zoom]);
-            this.ctx.strokeStyle = '#3498DB';
-            this.ctx.lineWidth = 2 / this.zoom;
-            this.ctx.fillStyle = 'rgba(52, 152, 219, 0.1)';
-            this.ctx.fillRect(x1, y1, width, height);
-            this.ctx.strokeRect(x1, y1, width, height);
-            this.ctx.restore();
+        // NEW ARCHITECTURE: All tools render their own previews
+        if (this.toolManager.getCurrentTool()) {
+            this.toolManager.renderPreview(this.ctx, this);
         }
 
         // Draw tooltip if hovering over graph control point
@@ -2088,6 +2150,69 @@ export const app = {
                 const canvasPos = graphToCanvas(point.x, point.y, graph);
                 this.drawTooltip(canvasPos.x, canvasPos.y, point.tooltip);
             }
+        }
+
+        // NEW ARCHITECTURE: Render tool previews
+        if (this.toolManager.getCurrentTool()) {
+            this.toolManager.renderPreview(this.ctx, this);
+        }
+
+        // Show rotation angle indicator while rotating
+        if (this.stateMachine.state === InteractionState.ROTATING && 
+            this.selectedObjects.length === 1) {
+            const obj = this.selectedObjects[0];
+            const center = this.getObjectCenter(obj);
+            
+            this.ctx.save();
+            this.ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset transform for text
+            
+            const screenPos = this.worldToScreen(center.x, center.y);
+            
+            // Draw rotation angle
+            this.ctx.font = 'bold 16px Arial';
+            this.ctx.fillStyle = this.isDarkMode ? '#FFFFFF' : '#000000';
+            this.ctx.strokeStyle = this.isDarkMode ? '#000000' : '#FFFFFF';
+            this.ctx.lineWidth = 3;
+            this.ctx.textAlign = 'center';
+            this.ctx.textBaseline = 'middle';
+            
+            const angleText = `${Math.round(obj.rotation || 0)}°`;
+            this.ctx.strokeText(angleText, screenPos.x, screenPos.y - 40);
+            this.ctx.fillText(angleText, screenPos.x, screenPos.y - 40);
+            
+            this.ctx.restore();
+        }
+
+        // Show "Precise Mode" indicator when Ctrl is held (only in select tool)
+        if (this.ctrlPressed && this.currentTool === 'select') {
+            this.ctx.save();
+            this.ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset transform for UI text
+            
+            this.ctx.font = 'bold 14px Arial';
+            this.ctx.fillStyle = '#FF6B35'; // Orange for visibility
+            this.ctx.textAlign = 'left';
+            this.ctx.textBaseline = 'top';
+            
+            const text = '🎯 Precise Mode (Ctrl)';
+            this.ctx.fillText(text, 10, 10);
+            
+            this.ctx.restore();
+        }
+
+        // Show Tab cycling info if objects are overlapping
+        if (this.objectsAtLastClick.length > 1 && this.selectedObjects.length === 1) {
+            this.ctx.save();
+            this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+            
+            this.ctx.font = '12px Arial';
+            this.ctx.fillStyle = this.isDarkMode ? '#AAAAAA' : '#666666';
+            this.ctx.textAlign = 'left';
+            this.ctx.textBaseline = 'top';
+            
+            const text = `${this.tabCycleIndex + 1}/${this.objectsAtLastClick.length} objects (Tab to cycle)`;
+            this.ctx.fillText(text, 10, this.ctrlPressed ? 32 : 10);
+            
+            this.ctx.restore();
         }
 
         this.ctx.restore();
@@ -2267,6 +2392,8 @@ export const app = {
                 if (curvedPathPropsContent) curvedPathPropsContent.style.display = 'none';
                 if (imagePropsContent) imagePropsContent.style.display = 'none';
                 if (graphPropsContent) graphPropsContent.style.display = 'block';
+                const freehandPropsContent = document.getElementById('freehandPropsContent');
+                if (freehandPropsContent) freehandPropsContent.style.display = 'none';
                 propsInfo.style.display = 'none';
 
                 // Update graph property values
@@ -2295,6 +2422,29 @@ export const app = {
                 const labelsBtn = document.getElementById('graphLabelsToggle');
                 if (labelsBtn) labelsBtn.textContent = obj.showLabels ? 'Enabled' : 'Disabled';
 
+            } else if (obj.type === 'freehand') {
+                // Show freehand properties
+                propsContent.style.display = 'none';
+                textPropsContent.style.display = 'none';
+                if (taperedLinePropsContent) taperedLinePropsContent.style.display = 'none';
+                if (curvedPathPropsContent) curvedPathPropsContent.style.display = 'none';
+                if (imagePropsContent) imagePropsContent.style.display = 'none';
+                if (graphPropsContent) graphPropsContent.style.display = 'none';
+                const freehandPropsContent = document.getElementById('freehandPropsContent');
+                if (freehandPropsContent) freehandPropsContent.style.display = 'block';
+                propsInfo.style.display = 'none';
+
+                // Update freehand property values
+                if (document.getElementById('freehandStrokeWidth')) {
+                    document.getElementById('freehandStrokeWidth').value = obj.strokeWidth || 2;
+                }
+                if (document.getElementById('freehandStrokeColor')) {
+                    document.getElementById('freehandStrokeColor').value = obj.strokeColor || '#000000';
+                }
+                if (document.getElementById('freehandLineStyle')) {
+                    document.getElementById('freehandLineStyle').value = obj.lineStyle || 'solid';
+                }
+
             } else if (obj.type === 'text') {
                 // Show text properties
                 propsContent.style.display = 'none';
@@ -2303,6 +2453,8 @@ export const app = {
                 if (curvedPathPropsContent) curvedPathPropsContent.style.display = 'none';
                 if (imagePropsContent) imagePropsContent.style.display = 'none';
                 if (graphPropsContent) graphPropsContent.style.display = 'none';
+                const freehandPropsContent2 = document.getElementById('freehandPropsContent');
+                if (freehandPropsContent2) freehandPropsContent2.style.display = 'none';
                 propsInfo.style.display = 'none';
 
                 // Update text property values
@@ -2332,6 +2484,8 @@ export const app = {
                 if (curvedPathPropsContent) curvedPathPropsContent.style.display = 'none';
                 if (imagePropsContent) imagePropsContent.style.display = 'none';
                 if (graphPropsContent) graphPropsContent.style.display = 'none';
+                const freehandPropsContent3 = document.getElementById('freehandPropsContent');
+                if (freehandPropsContent3) freehandPropsContent3.style.display = 'none';
                 propsInfo.style.display = 'none';
 
                 // Update tapered line property values
@@ -2363,6 +2517,8 @@ export const app = {
                 if (curvedPathPropsContent) curvedPathPropsContent.style.display = 'block';
                 if (imagePropsContent) imagePropsContent.style.display = 'none';
                 if (graphPropsContent) graphPropsContent.style.display = 'none';
+                const freehandPropsContent4 = document.getElementById('freehandPropsContent');
+                if (freehandPropsContent4) freehandPropsContent4.style.display = 'none';
                 propsInfo.style.display = 'none';
 
                 // Update curved path property values
@@ -2381,6 +2537,8 @@ export const app = {
                 if (curvedPathPropsContent) curvedPathPropsContent.style.display = 'none';
                 if (imagePropsContent) imagePropsContent.style.display = 'block';
                 if (graphPropsContent) graphPropsContent.style.display = 'none';
+                const freehandPropsContent5 = document.getElementById('freehandPropsContent');
+                if (freehandPropsContent5) freehandPropsContent5.style.display = 'none';
                 propsInfo.style.display = 'none';
 
                 // Update image property values
@@ -2401,6 +2559,8 @@ export const app = {
                 if (curvedPathPropsContent) curvedPathPropsContent.style.display = 'none';
                 if (imagePropsContent) imagePropsContent.style.display = 'none';
                 if (graphPropsContent) graphPropsContent.style.display = 'none';
+                const freehandPropsContent6 = document.getElementById('freehandPropsContent');
+                if (freehandPropsContent6) freehandPropsContent6.style.display = 'none';
                 propsInfo.style.display = 'none';
 
                 // Show/hide dimension inputs based on object type
@@ -2431,15 +2591,23 @@ export const app = {
                     positionInputRow.style.display = 'flex';
                     document.getElementById('objectX').value = Math.round(obj.x);
                     document.getElementById('objectY').value = Math.round(obj.y);
-                } else if (obj.type === 'rectangle' || obj.type === 'triangle' ||
-                           obj.type === 'hexagon' || obj.type === 'ellipse') {
-                    // Show width and height for rectangles and shapes
+                } else if (obj.type === 'rectangle' || obj.type === 'ellipse') {
+                    // Show width and height for rectangles and ellipse
                     dimensionInputRow.style.display = 'flex';
                     dimensionInputRow2.style.display = 'flex';
                     radiusInputRow.style.display = 'none';
                     positionInputRow.style.display = 'flex';
                     document.getElementById('objectWidth').value = Math.round(obj.width);
                     document.getElementById('objectHeight').value = Math.round(obj.height);
+                    document.getElementById('objectX').value = Math.round(obj.x);
+                    document.getElementById('objectY').value = Math.round(obj.y);
+                } else if (obj.type === 'triangle' || obj.type === 'hexagon' || obj.type === 'polygon') {
+                    // Show radius for polygons
+                    dimensionInputRow.style.display = 'none';
+                    dimensionInputRow2.style.display = 'none';
+                    radiusInputRow.style.display = 'flex';
+                    positionInputRow.style.display = 'flex';
+                    document.getElementById('objectRadius').value = Math.round(obj.radius);
                     document.getElementById('objectX').value = Math.round(obj.x);
                     document.getElementById('objectY').value = Math.round(obj.y);
                 } else if (obj.type === 'freehand') {
@@ -2464,7 +2632,7 @@ export const app = {
                 }
 
                 if (obj.fillColor !== undefined) {
-                    document.getElementById('fillColor').value = obj.fillColor === 'transparent' ? '#000000' : obj.fillColor;
+                    document.getElementById('fillColor').value = obj.fillColor === 'transparent' ? '#FFFFFF' : obj.fillColor;
                 }
                 if (obj.strokeColor !== undefined) {
                     document.getElementById('strokeColor').value = obj.strokeColor;
@@ -2480,6 +2648,8 @@ export const app = {
             if (curvedPathPropsContent) curvedPathPropsContent.style.display = 'none';
             if (imagePropsContent) imagePropsContent.style.display = 'none';
             if (graphPropsContent) graphPropsContent.style.display = 'none';
+            const freehandPropsContent7 = document.getElementById('freehandPropsContent');
+            if (freehandPropsContent7) freehandPropsContent7.style.display = 'none';
             propsInfo.style.display = 'block';
         }
     },
@@ -2507,6 +2677,9 @@ export const app = {
             if (obj.type === 'text' && prop === 'fontFamily') {
                 this.autoResizeTextbox(obj);
             }
+        } else if (prop === 'lineStyle') {
+            // Freehand line style
+            obj[prop] = value;
         }
 
         this.saveState();
@@ -2547,7 +2720,7 @@ export const app = {
                 }));
             }
         } else if (prop === 'radius') {
-            if (obj.type === 'circle') {
+            if (obj.type === 'circle' || obj.type === 'triangle' || obj.type === 'hexagon' || obj.type === 'polygon') {
                 obj.radius = Math.max(numValue, 1);
             }
         } else if (prop === 'x') {
@@ -2758,6 +2931,8 @@ export const app = {
         this.render();
     },
 
+    // Circuit functions removed - will rebuild later
+
     newCanvas() {
         if (this.objects.length > 0) {
             if (!confirm('Clear canvas? All objects will be deleted.')) return;
@@ -2843,6 +3018,55 @@ export const app = {
             reader.readAsText(file);
         };
         input.click();
+    },
+
+    toggleToolDropdown(category) {
+        const isOpen = category.classList.contains('open');
+        
+        // Close all dropdowns first
+        this.closeAllDropdowns();
+        
+        // Open this one if it wasn't already open
+        if (!isOpen) {
+            category.classList.add('open');
+        }
+    },
+
+    closeAllDropdowns() {
+        document.querySelectorAll('.toolCategory').forEach(cat => {
+            cat.classList.remove('open');
+        });
+    },
+
+    switchTool(toolName) {
+        console.log('🔧 Switching to tool:', toolName);
+        
+        // Update UI - make the tool active
+        document.querySelectorAll('.toolBtn').forEach(b => b.classList.remove('active'));
+        const toolBtn = document.querySelector(`.toolBtn[data-tool="${toolName}"]`);
+        if (toolBtn) {
+            toolBtn.classList.add('active');
+        }
+
+        const oldTool = this.currentTool;
+        
+        // CRITICAL: Set tool FIRST, then reset state
+        this.currentTool = toolName;
+        
+        // Reset interaction state
+        this.resetInteractionState();
+        
+        // Use ToolManager if tool is registered
+        if (this.toolManager.hasTool(toolName)) {
+            console.log(`  ✨ NEW architecture: ${toolName}`);
+            this.toolManager.switchTool(toolName);
+            this.stateMachine.transition(InteractionState.IDLE);
+        } else {
+            console.log(`  📦 OLD system: ${toolName}`);
+        }
+
+        console.log(`✅ Tool switched: ${oldTool} → ${this.currentTool}, State: ${this.stateMachine.state}`);
+        this.render();
     },
 
     export() {

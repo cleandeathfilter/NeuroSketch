@@ -688,3 +688,27 @@ export function getAllCircuitTemplates() {
     {name: 'Feedback Loop', generator: createFeedbackLoop}
   ];
 }
+
+/**
+ * Get a specific circuit template by name
+ * @param {string} circuitType - Circuit type identifier
+ * @returns {Object} Circuit template with neurons and synapses
+ */
+export function getCircuitTemplate(circuitType) {
+  const templates = {
+    'monosynaptic': createMonosynapticReflexArc,
+    'polysynaptic': createPolysynapticReflex,
+    'reciprocal': createReciprocalInhibition,
+    'feedforward': createFeedforwardInhibition,
+    'feedback': createFeedbackLoop
+  };
+
+  const generator = templates[circuitType];
+  if (!generator) {
+    console.error('Unknown circuit type:', circuitType);
+    return null;
+  }
+
+  // Generate circuit at origin (will be repositioned by caller)
+  return generator(0, 0);
+}

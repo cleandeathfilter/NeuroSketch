@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NeuroSketch</title>
+    <link rel="stylesheet" href="styles/gateway.css">
+</head>
+<body class="dark-mode">
+    <div id="gateway-container">
+        <div id="gateway-content">
+            <h1 id="gateway-title">NeuroSketch</h1>
+            <p id="gateway-tagline">Neuroscience creation and exploration</p>
+            
+            <div id="gateway-buttons">
+                <button id="create-btn" class="gateway-btn" onclick="navigateToCanvas()">
+                    CREATE
+                </button>
+                <button id="explore-btn" class="gateway-btn" onclick="navigateToExplore()">
+                    EXPLORE
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function navigateToCanvas() {
+            window.location.href = 'canvas.html';
+        }
+
+        function navigateToExplore() {
+            window.location.href = 'explore.html';
+        }
+    </script>
+</body>
+</html>

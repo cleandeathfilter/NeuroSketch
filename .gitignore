@@ -3,11 +3,21 @@
 ### Files to ignore 
 .claude/ 
 backup/
-docs/EXAMPLEprompts.md
-docs/textprompt.md
+docs/
 research/
 test/
+models/
+docs/archive/
 
 ### Server files to ignore
 *.sh
 *.bat
+
+### Test files to ignore 
+test*.html
+*test.html 
+
+*.env 
+AGENTS.md
+
+.DS_Store

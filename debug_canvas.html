@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Debug Canvas Load</title>
+</head>
+<body class="dark-mode">
+    <h1>Debug Canvas Load</h1>
+    <div id="log"></div>
+    
+    <script type="module">
+        const log = document.getElementById('log');
+        
+        function addLog(msg, color = 'black') {
+            log.innerHTML += `<p style="color: ${color}">${msg}</p>`;
+            console.log(msg);
+        }
+        
+        window.addEventListener('DOMContentLoaded', async () => {
+            try {
+                addLog('1. DOM Content Loaded', 'blue');
+                
+                addLog('2. Importing app.js...', 'blue');
+                const { app } = await import('./app.js');
+                addLog('3. ✅ app.js imported successfully', 'green');
+                
+                addLog('4. Making app global...', 'blue');
+                window.app = app;
+                addLog('5. ✅ window.app set', 'green');
+                
+                addLog('6. Calling app.init()...', 'blue');
+                app.init();
+                addLog('7. ✅ app.init() completed!', 'green');
+                
+                addLog('✅✅✅ ALL SUCCESSFUL! ✅✅✅', 'green');
+                
+            } catch (error) {
+                addLog(`❌ ERROR: ${error.message}`, 'red');
+                addLog(`Stack: ${error.stack}`, 'red');
+                console.error('FATAL ERROR during initialization:', error);
+            }
+        });
+    </script>
+</body>
+</html>
